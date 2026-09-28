@@ -18,20 +18,26 @@ class CouncilResult:
     critiques: list[dict[str, Any]] = field(default_factory=list)
     final: dict[str, Any] | None = None
     verified: bool = False
+    verification: dict[str, Any] = field(default_factory=dict)
 
 
 class AICouncil:
-    """Structured multi-model deliberation: independent work -> critique -> synthesis."""
+    """Multi-model deliberation with bounded execution and evidence-based verification."""
 
     DEFAULT_ROLES = (
-        ("architect", "Design the solution, identify constraints, interfaces, risks and a minimal executable plan."),
-        ("researcher", "Analyze facts, assumptions, alternatives and missing evidence. Flag uncertainty explicitly."),
-        ("coder", "Translate the task into concrete implementation steps, code-level decisions and verification criteria."),
-        ("critic", "Look for contradictions, unsafe assumptions, regressions and failure modes."),
+        ("architect", "Design the solution, constraints, interfaces, risks and minimal executable plan."),
+        ("researcher", "Analyze facts, assumptions, alternatives and missing evidence. Flag uncertainty."),
+        ("coder", "Translate the task into concrete implementation and verification criteria."),
+        ("critic", "Find contradictions, unsafe assumptions, regressions and failure modes."),
     )
 
-    def __init__(self, generate: Callable[[str, str, str], Awaitable[dict[str, Any]]]):
+    def __init__(
+        self,
+        generate: Callable[[str, str, int], Awaitable[dict[str, Any]]],
+        verify: Callable[[str, str], Awaitable[dict[str, Any]]] | None = None,
+    ):
         self.generate = generate
+        self.verify = verify
 
     async def deliberate(
         self,
@@ -40,49 +46,60 @@ class AICouncil:
         judge: str | None = None,
         context: str = "",
         max_tokens: int = 1200,
+        verify: bool = True,
     ) -> CouncilResult:
         if not providers:
             raise ValueError("At least one provider is required")
 
         members = [
-            CouncilMember(role=role, provider=providers[i % len(providers)], instruction=instruction)
-            for i, (role, instruction) in enumerate(self.DEFAULT_ROLES)
+            CouncilMember(role=r, provider=providers[i % len(providers)], instruction=instruction)
+            for i, (r, instruction) in enumerate(self.DEFAULT_ROLES)
         ]
-        independent: list[dict[str, Any]] = []
+
+        independent = []
         for member in members:
             prompt = (
                 f"You are the {member.role} member of Nexum AI Council. "
-                "Do not reveal hidden chain-of-thought. Return concise, structured conclusions.\n\n"
+                "Return concise conclusions, not hidden chain-of-thought.\n\n"
                 f"Role: {member.instruction}\nTask:\n{task}\nContext:\n{context}"
             )
             result = await self.generate(member.provider, prompt, max_tokens)
             independent.append({"role": member.role, **result})
 
-        critique_input = "\n\n".join(
-            f"=== {item['role']} / {item['provider']} ===\n{item['answer']}" for item in independent
+        candidates = "\n\n".join(
+            f"=== {x['role']} / {x['provider']} ===\n{x['answer']}" for x in independent
         )
-        critiques: list[dict[str, Any]] = []
+        critiques = []
         for member in members:
             prompt = (
-                f"You are the {member.role} critic in an AI council. "
                 "Review the candidate work below. Identify concrete conflicts, unsupported assumptions, "
-                "missing steps and the evidence needed to resolve them. Do not reveal hidden chain-of-thought.\n\n"
-                f"Original task:\n{task}\n\nCandidates:\n{critique_input}"
+                "missing steps and evidence required to resolve them. Do not reveal hidden chain-of-thought.\n\n"
+                f"Original task:\n{task}\n\nCandidates:\n{candidates}"
             )
             result = await self.generate(member.provider, prompt, max_tokens)
             critiques.append({"role": member.role, **result})
 
-        final: dict[str, Any] | None = None
+        final = None
         if judge:
-            evidence = critique_input + "\n\n=== CRITIQUES ===\n" + "\n\n".join(
-                f"=== {item['role']} / {item['provider']} ===\n{item['answer']}" for item in critiques
+            record = candidates + "\n\n=== CRITIQUES ===\n" + "\n\n".join(
+                f"=== {x['role']} / {x['provider']} ===\n{x['answer']}" for x in critiques
             )
             prompt = (
-                "You are the final judge of Nexum AI Council. Synthesize the strongest answer from the "
-                "candidate work and critiques. Resolve conflicts using explicit evidence and constraints. "
-                "Do not reveal hidden chain-of-thought. Return only the final actionable answer.\n\n"
-                f"Original task:\n{task}\n\nCouncil record:\n{evidence}"
+                "Synthesize the final actionable answer from the candidate work and critiques. "
+                "Resolve conflicts using explicit evidence and constraints. Do not reveal hidden chain-of-thought.\n\n"
+                f"Original task:\n{task}\n\nCouncil record:\n{record}"
             )
             final = await self.generate(judge, prompt, max_tokens)
 
-        return CouncilResult(task=task, members=independent, critiques=critiques, final=final, verified=False)
+        verification = {"ok": False, "checks": [], "evidence": []}
+        if verify and final and self.verify:
+            verification = await self.verify(task, final.get("answer", ""))
+
+        return CouncilResult(
+            task=task,
+            members=independent,
+            critiques=critiques,
+            final=final,
+            verified=bool(verification.get("ok")),
+            verification=verification,
+        )
