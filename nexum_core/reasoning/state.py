@@ -17,6 +17,7 @@ class ExecutionState:
     run_id: str = field(default_factory=lambda: str(uuid4()))
     phase: str = "planning"
     iteration: int = 0
+    current_step: str | None = None
     events: list[dict[str, Any]] = field(default_factory=list)
     verified: bool = False
     errors: list[str] = field(default_factory=list)
@@ -27,6 +28,7 @@ class ExecutionState:
             "run_id": self.run_id,
             "timestamp": now(),
             "kind": kind,
+            "iteration": self.iteration,
             **data,
         })
 
@@ -36,6 +38,8 @@ class RunRecord:
     task: str
     run_id: str = field(default_factory=lambda: str(uuid4()))
     status: str = "queued"
+    phase: str = "queued"
+    iteration: int = 0
     created_at: str = field(default_factory=now)
     started_at: str | None = None
     finished_at: str | None = None
@@ -43,6 +47,7 @@ class RunRecord:
     error: str | None = None
     events: list[dict[str, Any]] = field(default_factory=list)
     task_handle: asyncio.Task | None = field(default=None, repr=False, compare=False)
+    cancel_event: asyncio.Event = field(default_factory=asyncio.Event, repr=False, compare=False)
 
 
 class RunManager:
@@ -70,19 +75,25 @@ class RunManager:
     async def start(self, run_id: str, operation) -> RunRecord:
         record = self.runs[run_id]
         record.status = "running"
+        record.phase = "running"
         record.started_at = now()
         self.emit(run_id, "run_started")
         try:
             record.result = await operation()
-            record.status = "succeeded" if record.result.get("verified", False) else "failed"
-            self.emit(run_id, "run_finished", status=record.status, verified=record.result.get("verified", False))
+            verified = bool(record.result.get("verified", False)) if isinstance(record.result, dict) else False
+            record.iteration = int(record.result.get("iterations", 0)) if isinstance(record.result, dict) else 0
+            record.phase = "completed" if verified else ("cancelled" if record.result.get("cancelled") else "failed")
+            record.status = "succeeded" if verified else ("cancelled" if record.result.get("cancelled") else "failed")
+            self.emit(run_id, "run_finished", status=record.status, verified=verified)
         except asyncio.CancelledError:
             record.status = "cancelled"
+            record.phase = "cancelled"
             record.finished_at = now()
             self.emit(run_id, "run_cancelled")
             raise
         except Exception as exc:
             record.status = "failed"
+            record.phase = "failed"
             record.error = f"{type(exc).__name__}: {exc}"
             self.emit(run_id, "run_failed", error=record.error)
         finally:
@@ -101,10 +112,13 @@ class RunManager:
         record = self.get(run_id)
         if record.status in self.TERMINAL:
             return False
+        record.cancel_event.set()
+        self.emit(run_id, "cancel_requested")
         if record.task_handle and not record.task_handle.done():
             record.task_handle.cancel()
             return True
         record.status = "cancelled"
+        record.phase = "cancelled"
         record.finished_at = now()
         self.emit(run_id, "run_cancelled")
         return True
