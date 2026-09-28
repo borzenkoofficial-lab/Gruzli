@@ -12,6 +12,9 @@ from .config.settings import settings
 from .reasoning.loop import AgentLoop
 from .agents.orchestrator import Orchestrator
 from .conversation.engine import ConversationEngine
+from .reasoning.council import AICouncil
+from .reasoning.development import CouncilDevelopmentOrchestrator
+from .model.types import GenerationRequest, Message
 import json
 
 
@@ -45,7 +48,39 @@ class NexumRuntime:
         self.executor = ToolExecutor(self.tools)
         self.orchestrator = Orchestrator()
         self.loop = AgentLoop(self.router, self.executor)
+        async def council_generate(provider: str, prompt: str, max_tokens: int):
+            result = await self.router.generate_with_provider(
+                GenerationRequest([Message("user", prompt)], max_tokens=max_tokens, temperature=0.2),
+                provider,
+            )
+            return {"provider": provider, "model": result.model, "answer": result.content}
+        self.council = AICouncil(council_generate)
+        self.development = CouncilDevelopmentOrchestrator(self.council, self.loop)
         self.conversation = ConversationEngine(self.memory)
+
+    async def develop(
+        self,
+        task: str,
+        providers: list[str],
+        judge: str | None = None,
+        context: str = "",
+        cancel_check=None,
+        event_sink=None,
+        preferred_provider: str | None = None,
+        max_rounds: int = 2,
+        max_tokens: int = 1200,
+    ):
+        runner = CouncilDevelopmentOrchestrator(self.council, self.loop, max_rounds=max_rounds)
+        return await runner.run(
+            task,
+            providers,
+            judge=judge,
+            context=context,
+            preferred_provider=preferred_provider,
+            max_tokens=max_tokens,
+            cancel_check=cancel_check,
+            event_sink=event_sink,
+        )
 
     async def chat(self, task: str, context: str = "", cancel_check=None, event_sink=None, preferred_provider: str | None = None):
         cid = context.split(":", 1)[1] if context.startswith("conversation:") else "default"
