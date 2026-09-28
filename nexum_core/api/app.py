@@ -88,7 +88,7 @@ async def project_lifecycle(request: ProjectRequest):
     return get_project(request.path).lifecycle(install=True)
 
 
-@app.post("/projects/preview/start")
+@app.post("/projects/verify-repair")\nasync def project_verify_repair(request: ProjectRequest):\n    return get_project(request.path).verify_and_repair()\n\n\n@app.post("/projects/preview/start")
 async def preview_start(request: PreviewRequest):
     result = get_project(request.path).start_preview()
     return result.__dict__
