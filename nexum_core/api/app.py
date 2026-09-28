@@ -34,10 +34,18 @@ learning_engine = AutonomousLearningEngine(".")
 class ChatRequest(BaseModel):
     task: str
     context: str = ""
+    provider: str | None = None
+    model: str | None = None
 
 class MemoryRequest(BaseModel):
     text: str
     kind: str = "fact"
+
+class ProviderRequest(BaseModel):
+    name: str
+    base_url: str
+    api_key: str
+    model: str
 
 class ToolRequest(BaseModel):
     name: str
@@ -93,12 +101,12 @@ def run_view(record) -> dict[str, Any]:
             "iteration": record.iteration, "created_at": record.created_at, "started_at": record.started_at,
             "finished_at": record.finished_at, "result": result, "error": record.error, "event_count": len(record.events)}
 
-def start_run(task: str, context: str = ""):
+def start_run(task: str, context: str = "", request_provider: str | None = None):
     record = runs.create(task)
     def cancelled() -> bool: return record.cancel_event.is_set()
     def sink(event: dict) -> None:
         runs.emit(record.run_id, event["kind"], **{k:v for k,v in event.items() if k not in {"id","run_id","timestamp","kind"}})
-    async def operation(): return await runtime.chat(task, context, cancel_check=cancelled, event_sink=sink)
+    async def operation(): return await runtime.chat(task, context, cancel_check=cancelled, event_sink=sink, preferred_provider=request_provider)
     task_handle = asyncio.create_task(runs.start(record.run_id, operation()))
     runs.attach(record.run_id, task_handle)
     return record
@@ -227,6 +235,22 @@ async def models():
     provider=runtime.router.provider
     return {"provider":type(provider).__name__,"model":getattr(provider,"model",None),"available":runtime.router.available()}
 
+@app.post("/providers")
+async def register_provider(request: ProviderRequest):
+    try:
+        runtime.router.register_openai_compatible(request.name, request.base_url, request.api_key, request.model)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "provider": request.name.strip().lower().replace(" ", "_"), "model": request.model, "key_stored": "memory_only"}
+
+@app.delete("/providers/{name}")
+async def remove_provider(name: str):
+    return {"ok": runtime.router.remove(name), "provider": name}
+
+@app.get("/providers")
+async def providers():
+    return {"providers": runtime.router.available(), "security": "API keys are held in server memory only and are not returned by this API."}
+
 @app.get("/memory")
 async def memory(): return {"items":runtime.memory.all()}
 
@@ -240,7 +264,7 @@ async def execute_tool(request: ToolRequest):
 
 @app.post("/terminal/run")
 async def terminal_run(request: ChatRequest):
-    record = start_run(request.task, request.context)
+    record = start_run(request.task, request.context, request.provider)
     return {"run_id": record.run_id, "status": record.status, "events_url": f"/runs/{record.run_id}/events"}
 
 @app.post("/chat/stream")
