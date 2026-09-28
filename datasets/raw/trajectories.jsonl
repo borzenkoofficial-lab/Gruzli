@@ -1,0 +1,2 @@
+{"task":"Create a minimal health endpoint","messages":[{"role":"user","content":"Create a health endpoint"},{"role":"assistant","content":"Implemented /health and verified HTTP 200."}],"actions":[],"outcome":"verified","success":true}
+{"task":"Fix a workspace traversal bug","messages":[{"role":"user","content":"Prevent reading outside the workspace"},{"role":"assistant","content":"Resolved the target path and enforced root containment."}],"actions":[],"outcome":"verified","success":true}
