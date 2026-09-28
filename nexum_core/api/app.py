@@ -1,14 +1,22 @@
+from __future__ import annotations
+
+import asyncio
+import json
 from pathlib import Path
+from typing import Any, AsyncIterator
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from ..projects.runtime import ProjectRuntime
+from ..reasoning.state import RunManager
 from ..runtime import NexumRuntime
 from ..tools.executor import ToolCall
 
-app = FastAPI(title="Nexum AI Core", version="0.4.1")
+app = FastAPI(title="Nexum AI Core", version="0.5.0")
 runtime = NexumRuntime(".")
+runs = RunManager()
 project_runtimes: dict[str, ProjectRuntime] = {}
 
 
@@ -46,9 +54,23 @@ def get_project(path: str) -> ProjectRuntime:
     return project_runtimes[str(root)]
 
 
+def run_view(record) -> dict[str, Any]:
+    return {
+        "run_id": record.run_id,
+        "task": record.task,
+        "status": record.status,
+        "created_at": record.created_at,
+        "started_at": record.started_at,
+        "finished_at": record.finished_at,
+        "result": record.result,
+        "error": record.error,
+        "event_count": len(record.events),
+    }
+
+
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "nexum-ai-core", "version": "0.4.1"}
+    return {"status": "ok", "service": "nexum-ai-core", "version": "0.5.0"}
 
 
 @app.get("/agents")
@@ -59,6 +81,11 @@ async def agents():
 @app.get("/tools")
 async def tools():
     return {"tools": runtime.tools.schemas()}
+
+
+@app.get("/models")
+async def models():
+    return {"provider": type(runtime.router.provider).__name__}
 
 
 @app.get("/memory")
@@ -79,7 +106,70 @@ async def execute_tool(request: ToolRequest):
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
-    return await runtime.chat(request.task, request.context)
+    record = runs.create(request.task)
+    task = asyncio.create_task(
+        runs.start(record.run_id, lambda: runtime.chat(request.task, request.context))
+    )
+    runs.attach(record.run_id, task)
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+    return run_view(runs.get(record.run_id))
+
+
+@app.post("/runs")
+async def create_run(request: ChatRequest):
+    record = runs.create(request.task)
+    task = asyncio.create_task(
+        runs.start(record.run_id, lambda: runtime.chat(request.task, request.context))
+    )
+    runs.attach(record.run_id, task)
+    return run_view(record)
+
+
+@app.get("/runs")
+async def list_runs():
+    return {"runs": [run_view(record) for record in runs.runs.values()]}
+
+
+@app.get("/runs/{run_id}")
+async def get_run(run_id: str):
+    try:
+        return run_view(runs.get(run_id))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Run not found") from exc
+
+
+@app.post("/runs/{run_id}/cancel")
+async def cancel_run(run_id: str):
+    try:
+        ok = runs.cancel(run_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Run not found") from exc
+    return {"run_id": run_id, "cancelled": ok, "status": runs.get(run_id).status}
+
+
+@app.get("/runs/{run_id}/events")
+async def run_events(run_id: str):
+    try:
+        record = runs.get(run_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Run not found") from exc
+
+    async def stream() -> AsyncIterator[str]:
+        sent = 0
+        while True:
+            record = runs.get(run_id)
+            while sent < len(record.events):
+                event = record.events[sent]
+                sent += 1
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+            if record.status in runs.TERMINAL and sent >= len(record.events):
+                break
+            await asyncio.sleep(0.15)
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
 
 
 @app.post("/projects/inspect")
