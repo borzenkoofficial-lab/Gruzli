@@ -139,10 +139,10 @@ async def terminal_stream(prompt: str, system: str = "You are Nexum AI Core. Be 
     async def stream() -> AsyncIterator[str]:
         try:
             async for token in session.stream(prompt, system=system):
-                yield f"data: {json.dumps({'token': token}, ensure_ascii=False)}\\n\\n"
-            yield "data: " + json.dumps({"done": True}) + "\\n\\n"
+                yield f"data: {json.dumps({'token': token}, ensure_ascii=False)}\n\n"
+            yield "data: " + json.dumps({"done": True}) + "\n\n"
         except Exception as exc:
-            yield "data: " + json.dumps({"error": str(exc)}, ensure_ascii=False) + "\\n\\n"
+            yield "data: " + json.dumps({"error": str(exc)}, ensure_ascii=False) + "\n\n"
     return StreamingResponse(stream(), media_type="text/event-stream")
 
 @app.post("/conversation/observe")
@@ -314,26 +314,26 @@ async def multi_ai_stream(request: MultiAIRequest):
         return {"provider": name, "model": getattr(runtime.router.providers[name], "model", name), "answer": "".join(parts)}
 
     async def stream() -> AsyncIterator[str]:
-        yield "data: " + json.dumps({"kind":"multi_start","providers":selected,"judge":judge}, ensure_ascii=False) + "\\n\\n"
+        yield "data: " + json.dumps({"kind":"multi_start","providers":selected,"judge":judge}, ensure_ascii=False) + "\n\n"
         results = []
         tasks = [asyncio.create_task(generate_one(name)) for name in selected]
         for task in asyncio.as_completed(tasks):
             try:
                 result = await task
                 results.append(result)
-                yield "data: " + json.dumps({"kind":"ai_result", **result}, ensure_ascii=False) + "\\n\\n"
+                yield "data: " + json.dumps({"kind":"ai_result", **result}, ensure_ascii=False) + "\n\n"
             except Exception as exc:
-                yield "data: " + json.dumps({"kind":"ai_error","error":str(exc)}, ensure_ascii=False) + "\\n\\n"
+                yield "data: " + json.dumps({"kind":"ai_error","error":str(exc)}, ensure_ascii=False) + "\n\n"
         if judge and results:
             from ..model.types import GenerationRequest, Message
             evidence = "\n\n".join("=== " + x["provider"] + " (" + x["model"] + ") ===\n" + x["answer"] for x in results)
             judge_prompt = "Compare candidate answers and synthesize one final answer to the original task. Identify conflicts, discard unsupported claims, be concrete, and do not reveal hidden chain-of-thought.\n\nOriginal task:\n" + request.task + "\n\nCandidates:\n" + evidence
             try:
                 final = await runtime.router.generate_with_provider(GenerationRequest([Message("user", judge_prompt)], max_tokens=request.max_tokens, temperature=0.1), judge)
-                yield "data: " + json.dumps({"kind":"judge_result","provider":judge,"model":final.model,"answer":final.content}, ensure_ascii=False) + "\\n\\n"
+                yield "data: " + json.dumps({"kind":"judge_result","provider":judge,"model":final.model,"answer":final.content}, ensure_ascii=False) + "\n\n"
             except Exception as exc:
-                yield "data: " + json.dumps({"kind":"judge_error","error":str(exc)}, ensure_ascii=False) + "\\n\\n"
-        yield "data: " + json.dumps({"done":True,"providers":selected,"judge":judge}, ensure_ascii=False) + "\\n\\n"
+                yield "data: " + json.dumps({"kind":"judge_error","error":str(exc)}, ensure_ascii=False) + "\n\n"
+        yield "data: " + json.dumps({"done":True,"providers":selected,"judge":judge}, ensure_ascii=False) + "\n\n"
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 @app.post("/providers")
@@ -390,9 +390,9 @@ async def chat_stream(request: ChatRequest):
             while sent < len(current.events):
                 event = current.events[sent]
                 sent += 1
-                yield f"data: {json.dumps(event, ensure_ascii=False)}\\n\\n"
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
             if current.status in runs.TERMINAL and sent >= len(current.events):
-                yield f"data: {json.dumps({'done': True, 'run_id': record.run_id, 'status': current.status}, ensure_ascii=False)}\\n\\n"
+                yield f"data: {json.dumps({'done': True, 'run_id': record.run_id, 'status': current.status}, ensure_ascii=False)}\n\n"
                 break
             await asyncio.sleep(0.1)
     return StreamingResponse(stream(), media_type="text/event-stream")
