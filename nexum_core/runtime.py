@@ -5,6 +5,7 @@ from .tools.code_runner import CodeRunner
 from .tools.command_runner import RunCommand
 from .tools.executor import ToolExecutor
 from .tools.web import WebFetchTool, NetworkPolicy
+from .tools.base import Tool
 from .tools.git_workspace import GitWorkspaceTool
 from .projects.runtime import ProjectRuntime
 from .config.settings import settings
@@ -12,7 +13,7 @@ from .reasoning.loop import AgentLoop
 from .agents.orchestrator import Orchestrator
 
 
-class ProjectLifecycleTool:
+class ProjectLifecycleTool(Tool):
     name = "project_lifecycle"
     description = "Inspect, install, build, test, or run verification on a project in the workspace."
     parameters = {"type":"object","properties":{"operation":{"type":"string","enum":["inspect","install","build","test","verify"]},"path":{"type":"string","default":"."}},"required":["operation"],"additionalProperties":False}
