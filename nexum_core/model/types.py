@@ -26,3 +26,6 @@ class GenerationResult:
     model: str
     tool_calls: list[ToolCall] = field(default_factory=list)
     raw: Any = None
+
+# Backward-compatible public name used by providers and older runtime code.
+ModelResponse = GenerationResult
