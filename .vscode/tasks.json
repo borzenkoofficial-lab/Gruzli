@@ -1,0 +1,8 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {"label":"Nexum: install","type":"shell","command":"python -m pip install -e '.[dev]'","problemMatcher":[]},
+    {"label":"Nexum: run API","type":"shell","command":"python -m uvicorn nexum_core.api.app:app --host 0.0.0.0 --port 8000","isBackground":true,"problemMatcher":[]},
+    {"label":"Nexum: tests","type":"shell","command":"python -m pytest -q","problemMatcher":[]}
+  ]
+}
