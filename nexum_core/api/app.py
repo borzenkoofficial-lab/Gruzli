@@ -243,6 +243,23 @@ async def terminal_run(request: ChatRequest):
     record = start_run(request.task, request.context)
     return {"run_id": record.run_id, "status": record.status, "events_url": f"/runs/{record.run_id}/events"}
 
+@app.post("/chat/stream")
+async def chat_stream(request: ChatRequest):
+    record = start_run(request.task, request.context)
+    async def stream() -> AsyncIterator[str]:
+        sent = 0
+        while True:
+            current = runs.get(record.run_id)
+            while sent < len(current.events):
+                event = current.events[sent]
+                sent += 1
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\\n\\n"
+            if current.status in runs.TERMINAL and sent >= len(current.events):
+                yield f"data: {json.dumps({'done': True, 'run_id': record.run_id, 'status': current.status}, ensure_ascii=False)}\\n\\n"
+                break
+            await asyncio.sleep(0.1)
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
 @app.post("/chat")
 async def chat(request: ChatRequest):
     record=start_run(request.task,request.context)
