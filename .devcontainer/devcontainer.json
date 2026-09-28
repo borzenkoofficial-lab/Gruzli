@@ -1,0 +1,18 @@
+{
+  "name": "Nexum AI Core",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": { "version": "22" }
+  },
+  "postCreateCommand": "python -m pip install -e '.[dev]'",
+  "forwardPorts": [8000, 5173],
+  "portsAttributes": {
+    "8000": { "label": "Nexum Core API", "onAutoForward": "notify" },
+    "5173": { "label": "Project Preview", "onAutoForward": "openBrowser" }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python", "ms-python.vscode-pylance", "charliermarsh.ruff"]
+    }
+  }
+}
