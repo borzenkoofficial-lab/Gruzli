@@ -3,6 +3,7 @@ from pathlib import Path
 import tempfile
 
 from ..runtime import NexumRuntime
+from ..training.quality import DatasetQuality
 
 
 @dataclass
@@ -75,6 +76,10 @@ def run_runtime_evals() -> list[dict]:
         except Exception as exc:
             results.append(EvalResult("workspace_roundtrip", False, {"error": str(exc)}))
 
+    quality = DatasetQuality()
+    sample = {"task": "eval", "messages": [{"role": "assistant", "content": "verified"}], "actions": [{"name": "eval"}], "observations": [{"ok": True}], "verification": {"ok": True}, "success": True}
+    decision = quality.evaluate(sample)
+    results.append(EvalResult("training_quality", decision.accepted, {"score": decision.score, "fingerprint": decision.fingerprint}))
     return [item.as_dict() for item in results]
 
 
