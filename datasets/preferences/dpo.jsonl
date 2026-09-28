@@ -1,0 +1,1 @@
+{"prompt":[{"role":"user","content":"Create a verified hello file."}],"chosen":[{"role":"assistant","content":"I will inspect the workspace, create the file, then verify its contents."}],"rejected":[{"role":"assistant","content":"Done. I created it."}]}
