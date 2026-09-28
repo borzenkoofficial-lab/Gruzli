@@ -47,6 +47,13 @@ class ProviderRequest(BaseModel):
     api_key: str
     model: str
 
+class MultiAIRequest(BaseModel):
+    task: str
+    providers: list[str] = Field(default_factory=list)
+    judge: str | None = None
+    context: str = ""
+    max_tokens: int = 1200
+
 class ToolRequest(BaseModel):
     name: str
     arguments: dict = Field(default_factory=dict)
@@ -236,6 +243,45 @@ async def models():
     provider=runtime.router.provider
     return {"provider":type(provider).__name__,"model":getattr(provider,"model",None),"available":runtime.router.available()}
 
+
+@app.post("/multi-ai/stream")
+async def multi_ai_stream(request: MultiAIRequest):
+    available = runtime.router.available()
+    names = {item["name"] for item in available}
+    selected = [p for p in request.providers if p in names]
+    if not selected:
+        raise HTTPException(status_code=400, detail="No valid AI providers selected")
+    judge = request.judge if request.judge in names else None
+
+    async def generate_one(name: str):
+        from ..model.types import GenerationRequest, Message
+        prompt = "Solve independently as one member of a multi-AI team. Be concrete and concise.\n\nTask:\n" + request.task + "\n\nContext:\n" + request.context
+        result = await runtime.router.generate_with_provider(GenerationRequest([Message("user", prompt)], max_tokens=request.max_tokens, temperature=0.2), name)
+        return {"provider": name, "model": result.model, "answer": result.content}
+
+    async def stream() -> AsyncIterator[str]:
+        yield "data: " + json.dumps({"kind":"multi_start","providers":selected,"judge":judge}, ensure_ascii=False) + "\\n\\n"
+        results = []
+        tasks = [asyncio.create_task(generate_one(name)) for name in selected]
+        for task in asyncio.as_completed(tasks):
+            try:
+                result = await task
+                results.append(result)
+                yield "data: " + json.dumps({"kind":"ai_result", **result}, ensure_ascii=False) + "\\n\\n"
+            except Exception as exc:
+                yield "data: " + json.dumps({"kind":"ai_error","error":str(exc)}, ensure_ascii=False) + "\\n\\n"
+        if judge and results:
+            from ..model.types import GenerationRequest, Message
+            evidence = "\n\n".join("=== " + x["provider"] + " (" + x["model"] + ") ===\n" + x["answer"] for x in results)
+            judge_prompt = "Compare candidate answers and synthesize one final answer to the original task. Identify conflicts, discard unsupported claims, be concrete, and do not reveal hidden chain-of-thought.\n\nOriginal task:\n" + request.task + "\n\nCandidates:\n" + evidence
+            try:
+                final = await runtime.router.generate_with_provider(GenerationRequest([Message("user", judge_prompt)], max_tokens=request.max_tokens, temperature=0.1), judge)
+                yield "data: " + json.dumps({"kind":"judge_result","provider":judge,"model":final.model,"answer":final.content}, ensure_ascii=False) + "\\n\\n"
+            except Exception as exc:
+                yield "data: " + json.dumps({"kind":"judge_error","error":str(exc)}, ensure_ascii=False) + "\\n\\n"
+        yield "data: " + json.dumps({"done":True,"providers":selected,"judge":judge}, ensure_ascii=False) + "\\n\\n"
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
 @app.post("/providers")
 async def register_provider(request: ProviderRequest):
     try:
