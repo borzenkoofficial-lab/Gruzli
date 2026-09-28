@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -30,17 +31,31 @@ class RunCommand(Tool):
             raise ValueError(f"Command is not allowlisted: {command}")
         args = [str(item) for item in (args or [])]
         timeout = max(1, min(int(timeout), 120))
-        proc = subprocess.run(
-            [command, *args],
-            cwd=self.workspace,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            shell=False,
-        )
-        return {
-            "command": [command, *args],
-            "exit_code": proc.returncode,
-            "stdout": proc.stdout[-20000:],
-            "stderr": proc.stderr[-20000:],
+        env = {
+            key: value for key, value in os.environ.items()
+            if key in {"PATH", "HOME", "USERPROFILE", "SystemRoot", "TEMP", "TMP", "LANG", "LC_ALL"}
         }
+        env["NEXUM_WORKSPACE"] = str(self.workspace)
+        try:
+            proc = subprocess.run(
+                [command, *args],
+                cwd=self.workspace,
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                shell=False,
+            )
+            return {
+                "command": [command, *args],
+                "exit_code": proc.returncode,
+                "stdout": proc.stdout[-20000:],
+                "stderr": proc.stderr[-20000:],
+            }
+        except subprocess.TimeoutExpired as exc:
+            return {
+                "command": [command, *args],
+                "exit_code": -1,
+                "stdout": str(exc.stdout or "")[-20000:],
+                "stderr": "TIMEOUT",
+            }
