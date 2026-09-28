@@ -43,9 +43,9 @@ class ProjectRuntime:
     def package_manager(self) -> str | None:
         if (self.root / "pnpm-lock.yaml").exists():
             return "pnpm"
-        if (self.root / "package-lock.json").exists():
-            return "npm"
         if (self.root / "yarn.lock").exists():
+            return "yarn"
+        if (self.root / "package-lock.json").exists():
             return "npm"
         if (self.root / "package.json").exists():
             return "npm"
@@ -63,7 +63,10 @@ class ProjectRuntime:
         if not manager:
             return ProjectResult(False, "install", {"error": "No supported package manifest found"})
         self.state.set("installing", package_manager=manager)
-        args = ["ci", "--ignore-scripts"] if manager == "npm" and (self.root / "package-lock.json").exists() else ["install", "--ignore-scripts"]
+        if manager == "npm" and (self.root / "package-lock.json").exists():
+            args = ["ci", "--ignore-scripts"]
+        else:
+            args = ["install", "--ignore-scripts"]
         result = self.command(manager, args, 120)
         if not result.ok:
             result.details["parsed_error"] = self.errors.parse(result.details).__dict__
@@ -74,10 +77,10 @@ class ProjectRuntime:
         info = self.manager.inspect()
         if info["has_package_json"]:
             manager = self.package_manager() or "npm"
-            self.state.set("building")
+            self.state.set("building", operation="build")
             result = self.command(manager, ["run", "build"], 120)
         elif info["has_pyproject"]:
-            self.state.set("building")
+            self.state.set("building", operation="build")
             result = self.command("python", ["-m", "compileall", "-q", "."], 120)
         else:
             return ProjectResult(False, "build", {"error": "No supported project manifest found"})
@@ -90,10 +93,10 @@ class ProjectRuntime:
         info = self.manager.inspect()
         if info["has_package_json"]:
             manager = self.package_manager() or "npm"
-            self.state.set("testing")
+            self.state.set("testing", operation="test")
             result = self.command(manager, ["test"], 120)
         elif info["has_pyproject"]:
-            self.state.set("testing")
+            self.state.set("testing", operation="test")
             result = self.command("pytest", ["-q"], 120)
         else:
             return ProjectResult(False, "test", {"error": "No supported project manifest found"})
@@ -126,7 +129,20 @@ class ProjectRuntime:
             self.state.set("ready", restored_from=snapshot_id)
         return ProjectResult(ok, "restore", {"snapshot_id": snapshot_id})
 
-    def verify_and_repair(self, max_attempts: int = 3) -> dict[str, Any]:\n        from .repair import RepairEngine\n        checkpoint = self.checkpoint("before-verification-repair")\n        attempts = RepairEngine(self, max_attempts).verify_and_repair()\n        ok = bool(attempts) and attempts[-1].ok\n        if not ok and checkpoint.get("id"):\n            self.restore(checkpoint["id"])\n        return {"ok": ok, "checkpoint": checkpoint, "attempts": [a.__dict__ for a in attempts]}\n\n    def lifecycle(self, install: bool = True) -> dict[str, Any]:
+    def verify_and_repair(self, max_attempts: int = 3) -> dict[str, Any]:
+        from .repair import RepairEngine
+        checkpoint = self.checkpoint("before-verification-repair")
+        attempts = RepairEngine(self, max_attempts).verify_and_repair()
+        ok = bool(attempts) and attempts[-1].ok
+        if not ok and checkpoint.get("id"):
+            self.restore(checkpoint["id"])
+        return {
+            "ok": ok,
+            "checkpoint": checkpoint,
+            "attempts": [a.__dict__ for a in attempts],
+        }
+
+    def lifecycle(self, install: bool = True) -> dict[str, Any]:
         steps = [self.inspect()]
         if install:
             steps.append(self.install())
