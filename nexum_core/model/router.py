@@ -46,3 +46,13 @@ class ModelRouter:
             if provider is not self.providers["mock"]:
                 return await self.providers["mock"].generate(request)
             raise
+
+    async def stream(self, request, preferred: str | None = None):
+        task = " ".join(m.content for m in request.messages[-2:])
+        provider = self.select(task, preferred)
+        if hasattr(provider, "stream"):
+            async for token in provider.stream(request):
+                yield token
+            return
+        result = await provider.generate(request)
+        yield result.content
