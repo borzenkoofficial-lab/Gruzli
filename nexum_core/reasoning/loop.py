@@ -34,6 +34,7 @@ class AgentLoop:
         cancel_check: Callable[[], bool] | None = None,
         event_sink: Callable[[dict], None] | None = None,
         preferred_provider: str | None = None,
+        council_context: dict | None = None,
     ) -> dict:
         state = ExecutionState(task=task)
         trajectory = Trajectory(task=task, run_id=state.run_id, metadata={"agents": agents or []})\n        if council_context:\n            trajectory.record("council", council_context)
