@@ -2,13 +2,14 @@ from __future__ import annotations
 import os
 from typing import Any
 from .providers import MockProvider, OllamaProvider, OpenAICompatibleProvider, ModelProvider
+from ..config.settings import settings
 
 class ModelRouter:
     """Capability-aware provider router with deterministic fallback."""
     def __init__(self) -> None:
         self.providers: dict[str, ModelProvider] = {}
         self._register_defaults()
-        self.default = os.getenv("AI_PROVIDER", "mock").lower()
+        self.default = settings.ai_provider.lower()
 
     def register_openai_compatible(self, name: str, base_url: str, api_key: str, model: str) -> None:
         safe_name = name.strip().lower().replace(" ", "_")
@@ -23,23 +24,23 @@ class ModelRouter:
 
     def _register_defaults(self) -> None:
         self.providers["mock"] = MockProvider()
-        if os.getenv("OLLAMA_URL") or os.getenv("AI_PROVIDER", "mock").lower() == "ollama":
-            self.providers["ollama"] = OllamaProvider()
-        if os.getenv("OPENAI_BASE_URL") and os.getenv("OPENAI_API_KEY") and os.getenv("OPENAI_MODEL"):
+        if settings.ollama_url or settings.ai_provider.lower() == "ollama":
+            self.providers["ollama"] = OllamaProvider(settings.ollama_url, settings.ollama_model)
+        if os.getenv("OPENAI_BASE_URL") and settings.openai_api_key and os.getenv("OPENAI_MODEL"):
             self.providers["openai_compatible"] = OpenAICompatibleProvider(
-                os.environ["OPENAI_BASE_URL"], os.environ["OPENAI_API_KEY"], os.environ["OPENAI_MODEL"]
+                os.environ["OPENAI_BASE_URL"], settings.openai_api_key, os.environ["OPENAI_MODEL"]
             )
-        if os.getenv("DEEPSEEK_API_KEY"):
+        if settings.deepseek_api_key:
             self.providers["deepseek"] = OpenAICompatibleProvider(
-                os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1"),
-                os.environ["DEEPSEEK_API_KEY"],
-                os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
+                settings.deepseek_base_url,
+                settings.deepseek_api_key,
+                settings.deepseek_model,
             )
         if os.getenv("OPENAI_API_KEY") and "openai" not in self.providers:
             self.providers["openai"] = OpenAICompatibleProvider(
-                os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"),
+                settings.openai_base_url,
                 os.environ["OPENAI_API_KEY"],
-                os.getenv("OPENAI_MODEL", "gpt-4.1"),
+                settings.openai_model,
             )
 
     @property
