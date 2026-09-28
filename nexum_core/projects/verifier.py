@@ -27,3 +27,14 @@ class ProjectVerifier:
             result = self.runtime.test()
             checks.append({"name": "test", "ok": result.ok, "details": result.details})
         return VerificationReport(bool(checks) and all(c["ok"] for c in checks), checks)
+
+    def verify_lifecycle(self) -> VerificationReport:
+        lifecycle = self.runtime.lifecycle(install=True)
+        checks = []
+        for step in lifecycle["steps"]:
+            checks.append({
+                "name": step["operation"],
+                "ok": step["ok"],
+                "details": step["details"],
+            })
+        return VerificationReport(bool(checks) and lifecycle["ok"], checks)
