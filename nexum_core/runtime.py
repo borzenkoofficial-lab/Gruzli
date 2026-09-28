@@ -15,6 +15,5 @@ class NexumRuntime:
         self.loop = AgentLoop(self.router)
 
     async def chat(self, task: str, context: str = ""):
-        result = await self.loop.run(task, context)
-        result["agents"] = self.orchestrator.select(task)
-        return result
+        agents = self.orchestrator.select(task)
+        return await self.loop.run(task, context, agents)
