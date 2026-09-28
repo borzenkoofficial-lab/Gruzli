@@ -35,3 +35,16 @@ class Trajectory:
             }
         elif kind == "metadata":
             self.metadata.update(payload)
+
+    def to_training_record(self) -> dict[str, Any]:
+        return {
+            "task": self.task,
+            "run_id": self.run_id,
+            "created_at": self.created_at,
+            "messages": self.messages,
+            "actions": self.actions,
+            "observations": self.observations,
+            "verification": self.verification,
+            "success": self.success,
+            "metadata": self.metadata,
+        }
