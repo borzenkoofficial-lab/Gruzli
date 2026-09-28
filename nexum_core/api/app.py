@@ -17,6 +17,7 @@ from ..reasoning.state import RunManager
 from ..runtime import NexumRuntime
 from ..tools.executor import ToolCall
 from ..config.settings import settings
+from ..research import ResearchEngine
 
 app = FastAPI(title="Nexum AI Core", version="0.8.0")
 UI_DIR = Path(__file__).resolve().parent.parent / "ui"
@@ -26,6 +27,7 @@ runs = RunManager()
 learning = LearningMemory(runtime.memory)
 teacher = TeacherLoop(learning)
 project_runtimes: dict[str, ProjectRuntime] = {}
+research = ResearchEngine()
 
 class ChatRequest(BaseModel):
     task: str
@@ -132,6 +134,23 @@ async def learn_chat(request: ChatRequest):
     answer = await OllamaTerminalSession().chat(request.task, system="Use memory as context, not unquestioned truth.\n"+memory_context)
     learning.record_message(session_id, "assistant", answer)
     return {"session_id": session_id, "answer": answer, "recalled": recalled}
+
+class ResearchRequest(BaseModel):
+    query: str
+    urls: list[str] = Field(default_factory=list)
+
+@app.post("/research/fetch")
+async def research_fetch(request: ToolRequest):
+    if request.name != "web_fetch":
+        raise HTTPException(status_code=400, detail="use web_fetch")
+    result = runtime.executor.execute(ToolCall("web_fetch", request.arguments))
+    return {"ok": result.ok, "output": result.output, "error": result.error}
+
+@app.post("/research/run")
+async def research_run(request: ResearchRequest):
+    if not request.urls:
+        raise HTTPException(status_code=400, detail="urls are required")
+    return research.run(request.query, request.urls).__dict__
 
 @app.get("/network")
 async def network_status():
