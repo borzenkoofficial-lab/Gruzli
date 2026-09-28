@@ -55,6 +55,15 @@ class MultiAIRequest(BaseModel):
     context: str = ""
     max_tokens: int = 1200
 
+class DevelopmentRequest(BaseModel):
+    task: str
+    providers: list[str] = Field(default_factory=list)
+    judge: str | None = None
+    context: str = ""
+    preferred_provider: str | None = None
+    max_rounds: int = Field(default=2, ge=1, le=4)
+    max_tokens: int = Field(default=1200, ge=256, le=4096)
+
 class ToolRequest(BaseModel):
     name: str
     arguments: dict = Field(default_factory=dict)
