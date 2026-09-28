@@ -65,6 +65,35 @@ class OpenAICompatibleProvider:
         self.api_key = api_key
         self.model = model
 
+    async def stream(self, request: GenerationRequest) -> AsyncIterator[str]:
+        payload = {
+            "model": request.model or self.model,
+            "messages": [{"role": m.role, "content": m.content} for m in request.messages],
+            "temperature": request.temperature,
+            "max_tokens": request.max_tokens,
+            "stream": True,
+        }
+        headers = {"Authorization": f"Bearer {self.api_key}", "Accept": "text/event-stream"}
+        async with httpx.AsyncClient(timeout=None) as client:
+            async with client.stream("POST", f"{self.base_url}/chat/completions", json=payload, headers=headers) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if not line or not line.startswith("data:"):
+                        continue
+                    data_line = line[5:].strip()
+                    if data_line == "[DONE]":
+                        break
+                    try:
+                        data = __import__("json").loads(data_line)
+                    except ValueError:
+                        continue
+                    choices = data.get("choices") or []
+                    if choices:
+                        delta = choices[0].get("delta") or {}
+                        token = delta.get("content")
+                        if token:
+                            yield token
+
     async def generate(self, request: GenerationRequest) -> ModelResponse:
         payload = {
             "model": request.model or self.model,
