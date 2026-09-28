@@ -140,7 +140,7 @@ async def tools(): return {"tools":runtime.tools.schemas()}
 @app.get("/models")
 async def models():
     provider=runtime.router.provider
-    return {"provider":type(provider).__name__,"model":getattr(provider,"model",None)}
+    return {"provider":type(provider).__name__,"model":getattr(provider,"model",None),"available":runtime.router.available()}
 
 @app.get("/memory")
 async def memory(): return {"items":runtime.memory.all()}
