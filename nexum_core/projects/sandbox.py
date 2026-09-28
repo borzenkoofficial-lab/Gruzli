@@ -9,7 +9,9 @@ class SandboxPolicy:
     allow_network: bool = False
     max_timeout: int = 120
     max_output: int = 20000
-    allow_commands: tuple[str, ...] = ("python", "python3", "node", "npm", "npx", "pnpm", "pytest")
+    allow_commands: tuple[str, ...] = (
+        "python", "python3", "node", "npm", "npx", "pnpm", "yarn", "pytest"
+    )
 
 
 class Sandbox:
