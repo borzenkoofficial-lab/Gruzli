@@ -2,6 +2,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, asdict
 from typing import Any
+from html import unescape
 from ..tools.web import WebFetchTool
 
 @dataclass
@@ -24,7 +25,10 @@ class ResearchEngine:
 
     def fetch(self, url: str, max_bytes: int | None = None) -> Source:
         result = self.fetcher.execute(url, max_bytes=max_bytes)
-        text = re.sub(r"\s+", " ", result.get("text", "")).strip()
+        raw = result.get("text", "")
+        raw = re.sub(r"<(script|style)[^>]*>.*?</\\1>", " ", raw, flags=re.I | re.S)
+        text = unescape(re.sub(r"<[^>]+>", " ", raw))
+        text = re.sub(r"\\s+", " ", text).strip()
         title_match = re.search(r"<title[^>]*>(.*?)</title>", text, re.I | re.S)
         title = re.sub(r"<[^>]+>", "", title_match.group(1)).strip() if title_match else result["url"]
         return Source(result["url"], title[:300], text[:100000], result.get("status"))
