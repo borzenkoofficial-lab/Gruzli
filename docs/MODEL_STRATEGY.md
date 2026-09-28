@@ -15,3 +15,7 @@ Nexum is developed as a system, not a single checkpoint.
 
 Promote a model only when benchmarks improve without unacceptable regressions.
 Store structured actions, observations and verification rather than exposing private chain-of-thought.
+
+## Engineering status
+
+The runtime is being hardened around verified tool execution, structured trajectories, and reproducible post-training. Training is gated by evaluation rather than by model size alone.
