@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
+import json
 
 from ..memory.store import MemoryStore
 from ..reasoning.world_model import WorldModel
@@ -35,14 +36,43 @@ class ConversationEngine:
 
     def observe_user(self, state: ConversationState, text: str) -> dict[str, Any]:
         state.turns.append(ConversationTurn("user", text))
+        self._persist_turn(state, state.turns[-1])
         state.intent = self.classify_intent(text)
         return {"intent": state.intent, "context": self.context(state)}
 
     def observe_assistant(self, state: ConversationState, text: str, verified: bool = False):
         state.turns.append(ConversationTurn("assistant", text))
+        self._persist_turn(state, state.turns[-1])
         if verified and text.strip():
             self.memory.add(text, kind="verified_dialogue", metadata={"conversation_id": state.conversation_id})
         return self.context(state)
+
+
+    def load(self, conversation_id: str) -> ConversationState:
+        state = ConversationState(conversation_id=conversation_id)
+        path = Path("data/memory/conversation_turns.jsonl")
+        if path.exists():
+            for line in path.read_text(encoding="utf-8").splitlines():
+                try:
+                    item = json.loads(line)
+                    if item.get("conversation_id") == conversation_id:
+                        state.turns.append(ConversationTurn(item["role"], item["content"], item["timestamp"]))
+                except (ValueError, KeyError):
+                    continue
+        if state.turns:
+            state.intent = self.classify_intent(state.turns[-1].content)
+        return state
+
+    def _persist_turn(self, state: ConversationState, turn: ConversationTurn):
+        path = Path("data/memory/conversation_turns.jsonl")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps({
+                "conversation_id": state.conversation_id,
+                "role": turn.role,
+                "content": turn.content,
+                "timestamp": turn.timestamp
+            }, ensure_ascii=False) + "\n")
 
     def classify_intent(self, text: str) -> str:
         t=text.strip().lower()
