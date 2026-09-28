@@ -7,6 +7,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from ..evals.runtime import all_passed, run_runtime_evals
 from ..learning.teacher import TeacherLoop
+from ..learning.curriculum import AutonomousCurriculum
 from ..memory.conversation import LearningMemory
 from ..model.terminal import OllamaTerminalSession, detect_ollama
 from ..projects.runtime import ProjectRuntime
@@ -49,6 +50,11 @@ class TeachRequest(BaseModel):
     questions: list[str]
     session_id: str = "api"
 
+class CurriculumRequest(BaseModel):
+    topic: str
+    count: int = 5
+    session_id: str = "api-curriculum"
+
 def get_project(path: str) -> ProjectRuntime:
     root = Path(path).resolve()
     allowed = Path(".").resolve()
@@ -83,12 +89,19 @@ async def ollama_status():
 async def teacher_ask(request: TeacherRequest):
     result = await teacher.ask(request.question, session_id=request.session_id, remember=request.remember)
     return {"question": result.question, "answer": result.answer, "recalled": result.recalled,
-            "memory_item": result.memory_item, "verified": result.verified}
+            "memory_item": result.memory_item, "verified": result.verified, "confidence": result.confidence}
 
 @app.post("/teacher/teach")
 async def teacher_teach(request: TeachRequest):
     results = await teacher.teach(request.questions, session_id=request.session_id)
     return {"results": [r.__dict__ for r in results]}
+
+@app.post("/teacher/curriculum")
+async def teacher_curriculum(request: CurriculumRequest):
+    if not request.topic.strip():
+        raise HTTPException(status_code=400, detail="topic is required")
+    run = await AutonomousCurriculum(teacher).run(request.topic, request.count, request.session_id)
+    return run.__dict__
 
 @app.get("/learn/recall")
 async def learn_recall(query: str, limit: int = 8):
