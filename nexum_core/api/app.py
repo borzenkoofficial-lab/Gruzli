@@ -19,6 +19,7 @@ from ..runtime import NexumRuntime
 from ..tools.executor import ToolCall
 from ..config.settings import settings
 from ..research import ResearchEngine
+from ..reasoning.council import AICouncil
 
 app = FastAPI(title="Nexum AI Core", version="0.8.0")
 UI_DIR = Path(__file__).resolve().parent.parent / "ui"
@@ -242,6 +243,34 @@ async def tools(): return {"tools":runtime.tools.schemas()}
 async def models():
     provider=runtime.router.provider
     return {"provider":type(provider).__name__,"model":getattr(provider,"model",None),"available":runtime.router.available()}
+
+
+@app.post("/council")
+async def council(request: MultiAIRequest):
+    available = {item["name"] for item in runtime.router.available()}
+    selected = [p for p in request.providers if p in available]
+    if not selected:
+        raise HTTPException(status_code=400, detail="No valid AI providers selected")
+    judge = request.judge if request.judge in available else None
+
+    async def generate(provider: str, prompt: str, max_tokens: int):
+        from ..model.types import GenerationRequest, Message
+        result = await runtime.router.generate_with_provider(
+            GenerationRequest([Message("user", prompt)], max_tokens=max_tokens, temperature=0.2),
+            provider,
+        )
+        return {"provider": provider, "model": result.model, "answer": result.content}
+
+    result = await AICouncil(generate).deliberate(
+        request.task, selected, judge=judge, context=request.context, max_tokens=request.max_tokens
+    )
+    return {
+        "task": result.task,
+        "members": result.members,
+        "critiques": result.critiques,
+        "final": result.final,
+        "verified": result.verified,
+    }
 
 
 @app.post("/multi-ai/stream")
