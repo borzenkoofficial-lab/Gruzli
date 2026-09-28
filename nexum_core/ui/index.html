@@ -19,7 +19,7 @@
   <main class="main">
     <header class="topbar">
       <button class="icon-button mobile-only" id="menu">☰</button>
-      <div class="model-wrap"><button class="model-button" id="modelButton">Nexum Core <span>⌄</span></button><div class="model-menu hidden" id="modelMenu"><div id="providerOptions"></div><button id="addProvider">＋ Добавить ИИ по API</button></div></div>
+      <div class="model-wrap"><button class="model-button" id="modelButton">Nexum Core <span>⌄</span></button><div class="model-menu hidden" id="modelMenu"><div id="providerOptions"></div><button id="multiAI">◈ Команда ИИ</button><button id="addProvider">＋ Добавить ИИ по API</button></div></div>
       <div class="top-actions"><button class="icon-button" id="newChatTop" title="Новый чат">＋</button></div>
     </header>
     <section class="conversation" id="conversation">
@@ -52,6 +52,14 @@
     <p class="modal-note">Ключ передаётся Core и хранится только в памяти процесса. Он не возвращается интерфейсу.</p>
     <button class="primary" id="saveProvider">Подключить</button>
     <div id="providerError"></div>
+  </div>
+<div class="modal hidden" id="multiModal">
+  <div class="modal-card">
+    <div class="modal-head"><h2>Команда ИИ</h2><button class="icon-button" id="closeMulti">×</button></div>
+    <p class="modal-note">Несколько подключённых моделей решают одну задачу независимо. Судья затем синтезирует общий ответ.</p>
+    <div id="multiProviders"></div>
+    <label>Судья<select id="judgeProvider"></select></label>
+    <button class="primary" id="saveMulti">Готово</button>
   </div>
 </div>
 </main>
