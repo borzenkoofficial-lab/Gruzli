@@ -22,7 +22,7 @@ class RunCommand(Tool):
         "additionalProperties": False,
     }
 
-    ALLOWED = {"python", "python3", "node", "npm", "npx", "pnpm", "yarn", "pytest"}
+    ALLOWED = {"python", "python3", "node", "npm", "npx", "pnpm", "yarn", "pytest", "git"}
 
     def __init__(self, workspace: str):
         self.workspace = Path(workspace).resolve()
