@@ -2,45 +2,45 @@ from pathlib import Path
 from .base import Tool
 from .registry import ToolRegistry
 
-class WorkspaceTools:
+class WorkspaceTool(Tool):
     def __init__(self, root: str):
         self.root = Path(root).resolve()
 
-    def _path(self, relative: str) -> Path:
-        target = (self.root / relative).resolve()
-        if target != self.root and self.root not in target.parents:
-            raise PermissionError("Path escapes workspace")
+    def safe(self, path: str) -> Path:
+        target = (self.root / path).resolve()
+        target.relative_to(self.root)
         return target
 
-    def list_files(self, path: str = "."):
-        p = self._path(path)
-        return [str(x.relative_to(self.root)) for x in p.rglob("*") if x.is_file()]
+class ListFiles(WorkspaceTool):
+    name="list_files"; description="List files inside the workspace."
+    def execute(self, path="."):
+        return [str(p.relative_to(self.root)) for p in self.safe(path).rglob("*") if p.is_file()][:500]
 
-    def read_file(self, path: str):
-        return self._path(path).read_text(encoding="utf-8")
+class ReadFile(WorkspaceTool):
+    name="read_file"; description="Read a UTF-8 text file."
+    def execute(self, path):
+        return self.safe(path).read_text(encoding="utf-8")[:100000]
 
-    def write_file(self, path: str, content: str):
-        p = self._path(path)
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(content, encoding="utf-8")
-        return {"path": str(p.relative_to(self.root)), "bytes": len(content.encode())}
+class WriteFile(WorkspaceTool):
+    name="write_file"; description="Write a UTF-8 text file inside the workspace."
+    def execute(self, path, content):
+        p=self.safe(path); p.parent.mkdir(parents=True, exist_ok=True); p.write_text(content, encoding="utf-8"); return {"path":str(p.relative_to(self.root))}
 
-    def search_files(self, query: str):
-        hits = []
+class SearchFiles(WorkspaceTool):
+    name="search_files"; description="Search text inside workspace files."
+    def execute(self, query):
+        hits=[]
         for p in self.root.rglob("*"):
-            if p.is_file() and p.stat().st_size < 2_000_000:
+            if p.is_file() and len(hits)<200:
                 try:
-                    if query.lower() in p.read_text(encoding="utf-8").lower():
+                    if query.lower() in p.read_text(encoding="utf-8", errors="ignore").lower():
                         hits.append(str(p.relative_to(self.root)))
-                except UnicodeDecodeError:
+                except OSError:
                     pass
         return hits
 
-def build_registry(root: str) -> ToolRegistry:
-    ws = WorkspaceTools(root)
-    registry = ToolRegistry()
-    registry.register(Tool("list_files", "List workspace files", ws.list_files, {"type":"object","properties":{"path":{"type":"string"}}}))
-    registry.register(Tool("read_file", "Read UTF-8 text file", ws.read_file, {"type":"object","required":["path"],"properties":{"path":{"type":"string"}}}))
-    registry.register(Tool("write_file", "Write UTF-8 text file", ws.write_file, {"type":"object","required":["path","content"],"properties":{"path":{"type":"string"},"content":{"type":"string"}}}))
-    registry.register(Tool("search_files", "Search text across workspace", ws.search_files, {"type":"object","required":["query"],"properties":{"query":{"type":"string"}}}))
-    return registry
+def build_registry(workspace="."):
+    r=ToolRegistry()
+    for cls in (ListFiles, ReadFile, WriteFile, SearchFiles):
+        r.register(cls(workspace))
+    return r
