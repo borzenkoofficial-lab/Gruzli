@@ -29,6 +29,18 @@ class ModelRouter:
             self.providers["openai_compatible"] = OpenAICompatibleProvider(
                 os.environ["OPENAI_BASE_URL"], os.environ["OPENAI_API_KEY"], os.environ["OPENAI_MODEL"]
             )
+        if os.getenv("DEEPSEEK_API_KEY"):
+            self.providers["deepseek"] = OpenAICompatibleProvider(
+                os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1"),
+                os.environ["DEEPSEEK_API_KEY"],
+                os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
+            )
+        if os.getenv("OPENAI_API_KEY") and "openai" not in self.providers:
+            self.providers["openai"] = OpenAICompatibleProvider(
+                os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"),
+                os.environ["OPENAI_API_KEY"],
+                os.getenv("OPENAI_MODEL", "gpt-4.1"),
+            )
 
     @property
     def provider(self) -> ModelProvider:
