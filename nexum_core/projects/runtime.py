@@ -126,7 +126,7 @@ class ProjectRuntime:
             self.state.set("ready", restored_from=snapshot_id)
         return ProjectResult(ok, "restore", {"snapshot_id": snapshot_id})
 
-    def lifecycle(self, install: bool = True) -> dict[str, Any]:
+    def verify_and_repair(self, max_attempts: int = 3) -> dict[str, Any]:\n        from .repair import RepairEngine\n        checkpoint = self.checkpoint("before-verification-repair")\n        attempts = RepairEngine(self, max_attempts).verify_and_repair()\n        ok = bool(attempts) and attempts[-1].ok\n        if not ok and checkpoint.get("id"):\n            self.restore(checkpoint["id"])\n        return {"ok": ok, "checkpoint": checkpoint, "attempts": [a.__dict__ for a in attempts]}\n\n    def lifecycle(self, install: bool = True) -> dict[str, Any]:
         steps = [self.inspect()]
         if install:
             steps.append(self.install())
