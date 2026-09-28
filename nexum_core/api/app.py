@@ -205,6 +205,11 @@ async def execute_tool(request: ToolRequest):
     result=runtime.executor.execute(ToolCall(request.name, request.arguments))
     return {"name":result.name,"ok":result.ok,"output":result.output,"error":result.error}
 
+@app.post("/terminal/run")
+async def terminal_run(request: ChatRequest):
+    record = start_run(request.task, request.context)
+    return {"run_id": record.run_id, "status": record.status, "events_url": f"/runs/{record.run_id}/events"}
+
 @app.post("/chat")
 async def chat(request: ChatRequest):
     record=start_run(request.task,request.context)
