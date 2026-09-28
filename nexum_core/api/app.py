@@ -12,6 +12,7 @@ from ..learning.curriculum import AutonomousCurriculum
 from ..memory.conversation import LearningMemory
 from ..model.terminal import OllamaTerminalSession, detect_ollama
 from ..projects.runtime import ProjectRuntime
+from ..projects.repair_loop import RepairPlanner
 from ..reasoning.state import RunManager
 from ..runtime import NexumRuntime
 from ..tools.executor import ToolCall
@@ -39,6 +40,9 @@ class ToolRequest(BaseModel):
 
 class ProjectRequest(BaseModel):
     path: str
+
+class RepairPlanRequest(BaseModel):
+    parsed_error: dict[str, Any] = Field(default_factory=dict)
 
 class RestoreRequest(BaseModel):
     path: str
@@ -202,6 +206,11 @@ async def project_lifecycle(request: ProjectRequest): return get_project(request
 async def project_checkpoint(request: ProjectRequest): return get_project(request.path).checkpoint()
 @app.post("/projects/restore")
 async def project_restore(request: RestoreRequest): return get_project(request.path).restore(request.snapshot_id).__dict__
+@app.post("/projects/repair-plan")
+async def project_repair_plan(request: RepairPlanRequest):
+    plan = RepairPlanner().plan({"parsed_error": request.parsed_error})
+    return plan.__dict__
+
 @app.post("/projects/verify-repair")
 async def project_verify_repair(request: ProjectRequest): return get_project(request.path).verify_and_repair()
 @app.post("/projects/preview/start")
