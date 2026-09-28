@@ -33,6 +33,7 @@ class AgentLoop:
         agents: list[str] | None = None,
         cancel_check: Callable[[], bool] | None = None,
         event_sink: Callable[[dict], None] | None = None,
+        preferred_provider: str | None = None,
     ) -> dict:
         state = ExecutionState(task=task)
         trajectory = Trajectory(task=task, run_id=state.run_id, metadata={"agents": agents or []})
@@ -75,7 +76,8 @@ class AgentLoop:
             state.phase = "reasoning"
             try:
                 result = await self.router.generate(
-                    GenerationRequest(messages=messages, max_tokens=2048, temperature=0.2)
+                    GenerationRequest(messages=messages, max_tokens=2048, temperature=0.2),
+                    preferred=preferred_provider,
                 )
                 emit("model_output", iteration=i + 1, model=result.model, content=result.content)
                 trajectory.record("message", {"role": "model", "content": result.content, "iteration": i + 1})
