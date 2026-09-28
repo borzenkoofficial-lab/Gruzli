@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Any
 from ..memory.conversation import LearningMemory
 from ..model.terminal import OllamaTerminalSession
+from .verification import verify_lesson
 
 @dataclass
 class LearningResult:
@@ -11,6 +12,7 @@ class LearningResult:
     recalled: list[dict[str, Any]]
     memory_item: dict[str, Any] | None
     verified: bool
+    confidence: float
 
 class TeacherLoop:
     def __init__(self, memory: LearningMemory, teacher: OllamaTerminalSession | None = None):
@@ -27,17 +29,23 @@ class TeacherLoop:
             f"Relevant prior memory:\n{context}"
         )
         answer = await self.teacher.chat(question, system=system)
+        verification = verify_lesson(answer)
         item = None
-        if remember and answer.strip():
+        if remember and verification.ok:
             item = self.memory.remember(
                 f"Question: {question}\nAnswer: {answer}",
                 source=source or f"ollama:{self.teacher.model}",
-                kind="teacher_lesson", session_id=session_id, confidence=0.6
+                kind="teacher_lesson", session_id=session_id, confidence=verification.score
             )
-        return LearningResult(question, answer, recalled, item, False)
+        return LearningResult(question, answer, recalled, item, verification.ok, verification.score)
+
+    async def generate_questions(self, topic: str, count: int = 5) -> list[str]:
+        count = max(1, min(int(count), 20))
+        answer = await self.teacher.chat(
+            f"Create {count} concise technical study questions about: {topic}. Return one question per line.",
+            system="Generate a progressive curriculum from fundamentals to practical engineering. No answers."
+        )
+        return [line.strip("- •0123456789. ") for line in answer.splitlines() if line.strip()][:count]
 
     async def teach(self, questions: list[str], *, session_id: str = "teacher") -> list[LearningResult]:
-        results = []
-        for question in questions:
-            results.append(await self.ask(question, session_id=session_id))
-        return results
+        return [await self.ask(question, session_id=session_id) for question in questions]
