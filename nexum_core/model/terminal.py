@@ -1,5 +1,5 @@
 from __future__ import annotations
-import asyncio, os, shutil
+import asyncio, json, os, shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import AsyncIterator
@@ -22,6 +22,22 @@ class OllamaTerminalSession:
             response.raise_for_status()
             return response.json().get("response", "")
 
+    async def stream(self, prompt: str, system: str = "") -> AsyncIterator[str]:
+        import httpx
+        payload = {"model": self.model, "prompt": f"{system}\n\nuser: {prompt}".strip(), "stream": True}
+        async with httpx.AsyncClient(timeout=300) as client:
+            async with client.stream("POST", f"{self.base_url}/api/generate", json=payload) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if not line:
+                        continue
+                    item = json.loads(line)
+                    token = item.get("response", "")
+                    if token:
+                        yield token
+                    if item.get("done"):
+                        break
+
     async def available(self) -> bool:
         import httpx
         try:
@@ -29,6 +45,13 @@ class OllamaTerminalSession:
                 return (await client.get(f"{self.base_url}/api/tags")).is_success
         except Exception:
             return False
+
+    async def models(self) -> list[str]:
+        import httpx
+        async with httpx.AsyncClient(timeout=5) as client:
+            response = await client.get(f"{self.base_url}/api/tags")
+            response.raise_for_status()
+            return [item.get("name", "") for item in response.json().get("models", []) if item.get("name")]
 
 class InteractiveModelTerminal:
     def __init__(self, workspace: str = "."):
