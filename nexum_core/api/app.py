@@ -408,7 +408,7 @@ async def chat_stream(request: ChatRequest):
                 sent += 1
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
             if current.status in runs.TERMINAL and sent >= len(current.events):
-                yield f"data: {json.dumps({'done': True, 'run_id': record.run_id, 'status': current.status}, ensure_ascii=False)}\n\n"
+                view = run_view(current)\n                yield f"data: {json.dumps({'done': True, 'run_id': record.run_id, 'status': current.status, 'error': view['error'], 'result': view['result']}, ensure_ascii=False)}\n\n"
                 break
             await asyncio.sleep(0.1)
     return StreamingResponse(stream(), media_type="text/event-stream")
