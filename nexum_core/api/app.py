@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 from ..runtime import NexumRuntime
 from ..tools.executor import ToolCall
 
-app = FastAPI(title="Nexum AI Core", version="0.2.0")
+app = FastAPI(title="Nexum AI Core", version="0.3.0")
 runtime = NexumRuntime(".")
 
 class ChatRequest(BaseModel):
@@ -20,7 +20,7 @@ class ToolRequest(BaseModel):
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "nexum-ai-core", "version": "0.2.0"}
+    return {"status": "ok", "service": "nexum-ai-core", "version": "0.3.0"}
 
 @app.get("/agents")
 async def agents():
