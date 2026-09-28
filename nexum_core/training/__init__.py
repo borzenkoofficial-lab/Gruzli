@@ -1,4 +1,2 @@
-from .collector import TrajectoryCollector
-from .schema import Trajectory
-
-__all__ = ["Trajectory", "TrajectoryCollector"]
+from .dataset import DatasetRecord, DatasetStore
+__all__ = ["DatasetRecord", "DatasetStore"]
