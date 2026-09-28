@@ -4,7 +4,7 @@ import os
 import subprocess
 from pathlib import Path
 
-from .base import Tool
+from .base import Tool\nfrom ..projects.sandbox import Sandbox
 
 
 class RunCommand(Tool):
@@ -24,13 +24,13 @@ class RunCommand(Tool):
     ALLOWED = {"python", "python3", "node", "npm", "npx", "pnpm", "pytest"}
 
     def __init__(self, workspace: str):
-        self.workspace = Path(workspace).resolve()
+        self.workspace = Path(workspace).resolve()\n        self.sandbox = Sandbox(str(self.workspace))
 
     def execute(self, command: str, args: list[str] | None = None, timeout: int = 30) -> dict:
         if command not in self.ALLOWED:
             raise ValueError(f"Command is not allowlisted: {command}")
         args = [str(item) for item in (args or [])]
-        timeout = max(1, min(int(timeout), 120))
+        timeout = max(1, min(int(timeout), self.sandbox.policy.max_timeout))
         env = {
             key: value for key, value in os.environ.items()
             if key in {"PATH", "HOME", "USERPROFILE", "SystemRoot", "TEMP", "TMP", "LANG", "LC_ALL"}
