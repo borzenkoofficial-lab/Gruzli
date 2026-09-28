@@ -101,6 +101,22 @@ def start_run(task: str, context: str = ""):
     runs.attach(record.run_id, task_handle)
     return record
 
+@app.get("/terminal/stream")
+async def terminal_stream(prompt: str, system: str = "You are Nexum AI Core. Be precise and technical."):
+    if not prompt.strip():
+        raise HTTPException(status_code=400, detail="prompt is required")
+    session = OllamaTerminalSession()
+    if not await session.available():
+        raise HTTPException(status_code=503, detail="Ollama is unavailable")
+    async def stream() -> AsyncIterator[str]:
+        try:
+            async for token in session.stream(prompt, system=system):
+                yield f"data: {json.dumps({'token': token}, ensure_ascii=False)}\\n\\n"
+            yield "data: " + json.dumps({"done": True}) + "\\n\\n"
+        except Exception as exc:
+            yield "data: " + json.dumps({"error": str(exc)}, ensure_ascii=False) + "\\n\\n"
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
 @app.get("/ollama")
 async def ollama_status():
     session = OllamaTerminalSession()
