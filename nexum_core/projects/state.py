@@ -60,7 +60,7 @@ class ProjectState:
         if not source.is_dir():
             return False
         excluded = {".git", ".nexum", "node_modules", "__pycache__", ".venv"}
-        for path in list(self.root.rglob("*")):
+        for path in sorted(self.root.rglob("*"), key=lambda item: len(item.parts), reverse=True):
             if not path.is_file() or any(part in excluded for part in path.relative_to(self.root).parts):
                 continue
             path.unlink()
