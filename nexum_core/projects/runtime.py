@@ -9,7 +9,7 @@ from typing import Any
 from ..tools.command_runner import RunCommand
 from ..tools.executor import ToolCall, ToolExecutor
 from .dev_server import DevServerManager
-from .manager import ProjectManager
+from .manager import ProjectManager\nfrom .state import ProjectState\nfrom .error_parser import ErrorParser
 
 
 @dataclass
@@ -24,7 +24,7 @@ class ProjectRuntime:
         self.root = Path(workspace).resolve()
         self.manager = ProjectManager(str(self.root))
         self.executor = ToolExecutor(self._registry())
-        self.preview = DevServerManager(str(self.root))
+        self.preview = DevServerManager(str(self.root))\n        self.state = ProjectState(str(self.root))\n        self.errors = ErrorParser()
 
     def _registry(self):
         from ..tools.registry import ToolRegistry
@@ -45,7 +45,7 @@ class ProjectRuntime:
         info = self.manager.inspect()
         if not info["has_package_json"]:
             return ProjectResult(False, "install", {"error": "package.json not found"})
-        return self.command("npm", ["install", "--ignore-scripts"], 120)
+        self.state.set("installing")\n        result = self.command("npm", ["install", "--ignore-scripts"], 120)\n        self.state.set("ready" if result.ok else "failed", operation="install")\n        return result
 
     def build(self) -> ProjectResult:
         info = self.manager.inspect()
@@ -67,11 +67,11 @@ class ProjectRuntime:
         info = self.manager.inspect()
         if not info["has_package_json"]:
             return ProjectResult(False, "preview", {"error": "Preview currently supports package.json projects"})
-        result = self.preview.start("npm", ["run", "dev", "--", "--host", "127.0.0.1"])
+        result = self.preview.start("npm", ["run", "dev", "--", "--host", "127.0.0.1"])\n        self.state.set("running" if result.ok else "failed", pid=result.pid)
         return ProjectResult(result.ok, "preview", result.__dict__)
 
     def stop_preview(self, pid: int) -> ProjectResult:
-        return ProjectResult(self.preview.stop(pid), "preview_stop", {"pid": pid})
+        ok = self.preview.stop(pid)\n        if ok:\n            self.state.set("stopped", pid=pid)\n        return ProjectResult(ok, "preview_stop", {"pid": pid})
 
     def lifecycle(self, install: bool = True) -> dict[str, Any]:
         steps = [self.inspect()]
