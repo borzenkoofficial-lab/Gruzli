@@ -12,6 +12,7 @@ from .planner import Planner
 from .verifier import Verifier
 from .self_correction import classify_failure, repair_instruction
 from .retry import RetryBudget
+from ..projects.repair_loop import RepairPlanner
 
 
 @dataclass
@@ -34,6 +35,7 @@ class AgentLoop:
         trajectory = Trajectory(task=task, run_id=state.run_id, metadata={"agents": agents or []})
         planner = Planner()
         verifier = Verifier()
+        repair_planner = RepairPlanner()
         retry = RetryBudget(self.max_retries)
         registry = self.executor.registry if self.executor else None
         tool_names = registry.names() if registry else []
@@ -133,6 +135,13 @@ class AgentLoop:
                     trajectory.record("observation", {"action_id": action.id, "ok": tool_result.ok, "output": tool_result.output, "error": tool_result.error})
                     if tool_result.ok:
                         outputs.append(tool_result.output)
+                        if action.tool == "project_lifecycle" and isinstance(tool_result.output, dict) and tool_result.output.get("ok") is False:
+                            details = {"parsed_error": tool_result.output.get("details", {}).get("parsed_error", {})}
+                            plan = repair_planner.plan(details)
+                            emit("repair_plan", category=plan.category, instruction=plan.instruction, evidence=plan.evidence, file=plan.file, line=plan.line)
+                            trajectory.record("repair", {"category": plan.category, "instruction": plan.instruction, "evidence": plan.evidence, "file": plan.file, "line": plan.line})
+                            messages.append(Message("user", f"Verification failed. Repair required: {plan.instruction}. Evidence: {plan.evidence}. Inspect affected files, mutate them, then rerun build/test/verify."))
+                            continue
                     else:
                         error = tool_result.error or "tool failed"
                         state.errors.append(error)
