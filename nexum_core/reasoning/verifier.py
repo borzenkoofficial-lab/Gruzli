@@ -13,6 +13,9 @@ class Verification:
 class Verifier:
     def verify(self, outputs: list[Any], required: str) -> Verification:
         evidence = [item for item in outputs if item is not None]
+        failed = [item for item in evidence if isinstance(item, dict) and item.get("ok") is False]
+        if failed:
+            return Verification(False, evidence, ["Structured execution result reports failure"], [{"type": "structured_status", "ok": False, "failed": failed}])
         if not evidence:
             return Verification(False, [], ["No observable execution output"], [])
 
