@@ -1,14 +1,20 @@
 from __future__ import annotations
 import os
-from typing import Protocol
+from typing import Protocol, AsyncIterator
 import httpx
 from .types import GenerationRequest, ModelResponse
 
 class ModelProvider(Protocol):
     name: str
     async def generate(self, request: GenerationRequest) -> ModelResponse: ...
+    async def stream(self, request: GenerationRequest) -> AsyncIterator[str]: ...
 
 class MockProvider:
+    async def stream(self, request: GenerationRequest) -> AsyncIterator[str]:
+        result = await self.generate(request)
+        yield result.content
+
+
     name = "mock"
     async def generate(self, request: GenerationRequest) -> ModelResponse:
         last = next((m for m in reversed(request.messages) if m.role == "user"), None)
