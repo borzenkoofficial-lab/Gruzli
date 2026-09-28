@@ -316,7 +316,7 @@ async def terminal_run(request: ChatRequest):
 
 @app.post("/chat/stream")
 async def chat_stream(request: ChatRequest):
-    record = start_run(request.task, request.context)
+    record = start_run(request.task, request.context, request.provider)
     async def stream() -> AsyncIterator[str]:
         sent = 0
         while True:
