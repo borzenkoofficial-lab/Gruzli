@@ -13,13 +13,12 @@ class LearningResult:
     verified: bool
 
 class TeacherLoop:
-    """Lets Core ask a local teacher model questions and retain lessons."""
     def __init__(self, memory: LearningMemory, teacher: OllamaTerminalSession | None = None):
         self.memory = memory
         self.teacher = teacher or OllamaTerminalSession()
 
     async def ask(self, question: str, *, session_id: str = "teacher",
-                  remember: bool = True, source: str = "ollama:qwen") -> LearningResult:
+                  remember: bool = True, source: str | None = None) -> LearningResult:
         recalled = self.memory.recall(question, limit=8)
         context = "\n".join(item.get("text", "") for item in recalled)
         system = (
@@ -32,9 +31,13 @@ class TeacherLoop:
         if remember and answer.strip():
             item = self.memory.remember(
                 f"Question: {question}\nAnswer: {answer}",
-                source=source, kind="teacher_lesson", session_id=session_id, confidence=0.6
+                source=source or f"ollama:{self.teacher.model}",
+                kind="teacher_lesson", session_id=session_id, confidence=0.6
             )
         return LearningResult(question, answer, recalled, item, False)
 
     async def teach(self, questions: list[str], *, session_id: str = "teacher") -> list[LearningResult]:
-        return [await self.ask(q, session_id=session_id) for q in questions]
+        results = []
+        for question in questions:
+            results.append(await self.ask(question, session_id=session_id))
+        return results
