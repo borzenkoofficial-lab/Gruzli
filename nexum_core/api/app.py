@@ -49,7 +49,10 @@ class ProjectRunRequest(BaseModel):
     operation: str
     install: bool = False
 
-class RepairPlanRequest(BaseModel):
+class ProjectCloneRequest(BaseModel):
+    repository: str
+    path: str
+\nclass RepairPlanRequest(BaseModel):
     parsed_error: dict[str, Any] = Field(default_factory=dict)
 
 class RestoreRequest(BaseModel):
