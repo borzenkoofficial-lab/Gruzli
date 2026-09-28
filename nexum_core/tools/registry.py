@@ -2,7 +2,7 @@ from .base import Tool
 
 class ToolRegistry:
     def __init__(self):
-        self._tools: dict[str, Tool] = {}
+        self._tools = {}
 
     def register(self, tool: Tool):
         self._tools[tool.name] = tool
