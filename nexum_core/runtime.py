@@ -11,6 +11,8 @@ from .projects.runtime import ProjectRuntime
 from .config.settings import settings
 from .reasoning.loop import AgentLoop
 from .agents.orchestrator import Orchestrator
+from .conversation.engine import ConversationEngine
+import json
 
 
 class ProjectLifecycleTool(Tool):
@@ -43,7 +45,17 @@ class NexumRuntime:
         self.executor = ToolExecutor(self.tools)
         self.orchestrator = Orchestrator()
         self.loop = AgentLoop(self.router, self.executor)
+        self.conversation = ConversationEngine(self.memory)
 
     async def chat(self, task: str, context: str = "", cancel_check=None, event_sink=None):
+        cid = context.split(":", 1)[1] if context.startswith("conversation:") else "default"
+        state = self.conversation.load(cid)
+        observed = self.conversation.observe_user(state, task)
+        conversational_context = json.dumps(observed["context"], ensure_ascii=False)
+        merged = f"{context}\nConversation context:\n{conversational_context}"
         agents = self.orchestrator.select(task)
-        return await self.loop.run(task, context, agents, cancel_check=cancel_check, event_sink=event_sink)
+        result = await self.loop.run(task, merged, agents, cancel_check=cancel_check, event_sink=event_sink)
+        if isinstance(result, dict):
+            self.conversation.observe_assistant(state, str(result.get("answer", "")), bool(result.get("verified")))
+            result["conversation_id"] = cid
+        return result
