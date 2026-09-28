@@ -113,6 +113,14 @@ class CurriculumRequest(BaseModel):
 async def ui_home():
     return FileResponse(UI_DIR / "index.html")
 
+@app.get("/style.css", include_in_schema=False)
+async def ui_style():
+    return FileResponse(UI_DIR / "style.css", media_type="text/css")
+
+@app.get("/app.js", include_in_schema=False)
+async def ui_script():
+    return FileResponse(UI_DIR / "app.js", media_type="application/javascript")
+
 def get_project(path: str) -> ProjectRuntime:
     root = Path(path).resolve()
     allowed = Path(".").resolve()
