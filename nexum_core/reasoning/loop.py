@@ -50,6 +50,7 @@ class AgentLoop:
             Message("user", f"Task:\n{task}\nContext:\n{context}\nAgents: {agents or []}\nPlan: {[s.__dict__ for s in plan.steps]}\nTools: {registry.prompt_schemas() if registry else '[]'}"),
         ]
         trajectory.record("message", {"role": "system", "content": SYSTEM_POLICY})
+        trajectory.record("message", {"role": "user", "content": task, "context": context})
 
         seen: set[tuple[str, str]] = set()
         outputs: list[object] = []
@@ -149,6 +150,7 @@ class AgentLoop:
         state.phase = "failed"
         trajectory.success = False
         trajectory.record("verification", {"ok": False, "evidence": outputs, "errors": state.errors or ["Execution budget exhausted"]})
+        trajectory.metadata["completion"] = {"verified": False, "phase": state.phase, "iterations": state.iteration}
         trajectory.metadata["retry_budget"] = {"max_retries": retry.max_retries, "used": retry.used, "failures": retry.failures}
         TrajectoryCollector(self.trajectory_path).append(trajectory)
         return {"run_id": state.run_id, "answer": "Execution budget exhausted without verified completion.", "iterations": state.iteration, "verified": False, "events": state.events}
