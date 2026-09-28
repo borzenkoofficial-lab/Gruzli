@@ -70,6 +70,23 @@ class ModelRouter:
                 return await self.providers["mock"].generate(request)
             raise
 
+    async def generate_with_provider(self, request, provider_name: str):
+        provider = self.providers.get(provider_name)
+        if provider is None:
+            raise ValueError(f"Unknown provider: {provider_name}")
+        return await provider.generate(request)
+
+    async def stream_with_provider(self, request, provider_name: str):
+        provider = self.providers.get(provider_name)
+        if provider is None:
+            raise ValueError(f"Unknown provider: {provider_name}")
+        if hasattr(provider, "stream"):
+            async for token in provider.stream(request):
+                yield token
+            return
+        result = await provider.generate(request)
+        yield result.content
+
     async def stream(self, request, preferred: str | None = None):
         task = " ".join(m.content for m in request.messages[-2:])
         provider = self.select(task, preferred)
