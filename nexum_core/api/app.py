@@ -10,6 +10,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from ..evals.runtime import all_passed, run_runtime_evals
+from ..memory.conversation import LearningMemory
+from ..model.terminal import OllamaTerminalSession, detect_ollama
 from ..projects.runtime import ProjectRuntime
 from ..reasoning.state import RunManager
 from ..runtime import NexumRuntime
@@ -18,6 +20,7 @@ from ..tools.executor import ToolCall
 app = FastAPI(title="Nexum AI Core", version="0.6.0")
 runtime = NexumRuntime(".")
 runs = RunManager()
+learning = LearningMemory(runtime.memory)
 project_runtimes: dict[str, ProjectRuntime] = {}
 
 
@@ -92,6 +95,38 @@ def start_run(task: str, context: str = ""):
     task_handle = asyncio.create_task(runs.start(record.run_id, operation()))
     runs.attach(record.run_id, task_handle)
     return record
+
+
+@app.get("/ollama")
+async def ollama_status():
+    session = OllamaTerminalSession()
+    return {**detect_ollama(), "reachable": await session.available(), "url": session.base_url, "model": session.model}
+
+
+@app.post("/learn/remember")
+async def learn_remember(request: MemoryRequest):
+    return learning.remember(request.text, source="api", kind=request.kind)
+
+
+@app.get("/learn/recall")
+async def learn_recall(query: str, limit: int = 8):
+    return {"items": learning.recall(query, limit)}
+
+
+@app.post("/learn/chat")
+async def learn_chat(request: ChatRequest):
+    session_id = request.context or "default"
+    learning.record_message(session_id, "user", request.task)
+    recalled = learning.recall(request.task, limit=8)
+    memory_context = "\n".join(item["text"] for item in recalled)
+    answer = await OllamaTerminalSession().chat(
+        request.task,
+        system="You are Nexum Core learning with persistent retrieval memory. "
+               "Use recalled facts as context, but do not treat unverified claims as truth. "
+               f"Recalled memory:\n{memory_context}",
+    )
+    learning.record_message(session_id, "assistant", answer)
+    return {"session_id": session_id, "answer": answer, "recalled": recalled}
 
 
 @app.get("/health")
