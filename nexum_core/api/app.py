@@ -297,6 +297,18 @@ async def register_provider(request: ProviderRequest):
 async def remove_provider(name: str):
     return {"ok": runtime.router.remove(name), "provider": name}
 
+@app.post("/providers/{name}/test")
+async def test_provider(name: str):
+    from ..model.types import GenerationRequest, Message
+    try:
+        result = await runtime.router.generate_with_provider(
+            GenerationRequest([Message("user", "Reply with exactly: NEXUM_PROVIDER_OK")], max_tokens=32, temperature=0),
+            name,
+        )
+        return {"ok": True, "provider": name, "model": result.model, "response": result.content}
+    except Exception as exc:
+        return {"ok": False, "provider": name, "error": str(exc)}
+
 @app.get("/providers")
 async def providers():
     return {"providers": runtime.router.available(), "security": "API keys are held in server memory only and are not returned by this API."}
@@ -336,7 +348,7 @@ async def chat_stream(request: ChatRequest):
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
-    record=start_run(request.task,request.context)
+    record=start_run(request.task,request.context,request.provider)
     try: await record.task_handle
     except asyncio.CancelledError: pass
     return run_view(runs.get(record.run_id))
