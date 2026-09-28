@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from ..evals.runtime import all_passed, run_runtime_evals
 from ..learning.teacher import TeacherLoop
 from ..learning.curriculum import AutonomousCurriculum
+from ..learning.autonomous import AutonomousLearningEngine
 from ..memory.conversation import LearningMemory
 from ..model.terminal import OllamaTerminalSession, detect_ollama
 from ..projects.runtime import ProjectRuntime
@@ -28,6 +29,7 @@ learning = LearningMemory(runtime.memory)
 teacher = TeacherLoop(learning)
 project_runtimes: dict[str, ProjectRuntime] = {}
 research = ResearchEngine()
+learning_engine = AutonomousLearningEngine(".")
 
 class ChatRequest(BaseModel):
     task: str
@@ -116,6 +118,23 @@ async def terminal_stream(prompt: str, system: str = "You are Nexum AI Core. Be 
         except Exception as exc:
             yield "data: " + json.dumps({"error": str(exc)}, ensure_ascii=False) + "\\n\\n"
     return StreamingResponse(stream(), media_type="text/event-stream")
+
+@app.get("/learning/status")
+async def learning_status():
+    return learning_engine.status()
+
+@app.post("/learning/cycle")
+async def learning_cycle():
+    return learning_engine.cycle().__dict__
+
+class LearningTrainRequest(BaseModel):
+    model: str
+    output: str = "artifacts/sft"
+    min_records: int = 8
+
+@app.post("/learning/train")
+async def learning_train(request: LearningTrainRequest):
+    return learning_engine.train_sft(request.model, request.output, request.min_records)
 
 @app.get("/ollama")
 async def ollama_status():
