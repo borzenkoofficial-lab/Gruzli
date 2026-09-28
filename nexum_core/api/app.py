@@ -261,8 +261,20 @@ async def council(request: MultiAIRequest):
         )
         return {"provider": provider, "model": result.model, "answer": result.content}
 
-    result = await AICouncil(generate).deliberate(
-        request.task, selected, judge=judge, context=request.context, max_tokens=request.max_tokens
+    async def verify(task: str, answer: str):
+        # Council verification is deliberately evidence-based: no answer is accepted
+        # merely because a model claims it is correct.
+        from ..reasoning.critic import Critic
+        reflection = Critic().evaluate(task, answer, bool(answer.strip()), [])
+        return {
+            "ok": reflection.accepted,
+            "checks": [{"type": "answer_presence", "ok": bool(answer.strip())}],
+            "evidence": reflection.strengths,
+            "issues": reflection.weaknesses,
+        }
+
+    result = await AICouncil(generate, verify=verify).deliberate(
+        request.task, selected, judge=judge, context=request.context, max_tokens=request.max_tokens, verify=True
     )
     return {
         "task": result.task,
@@ -270,6 +282,7 @@ async def council(request: MultiAIRequest):
         "critiques": result.critiques,
         "final": result.final,
         "verified": result.verified,
+        "verification": result.verification,
     }
 
 
