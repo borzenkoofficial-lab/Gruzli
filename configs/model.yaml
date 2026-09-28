@@ -1,0 +1,15 @@
+provider: mock
+
+runtime:
+  max_iterations: 8
+  temperature: 0.2
+  max_tokens: 2048
+
+models:
+  fast: qwen3:4b
+  deep: qwen3:14b
+
+training:
+  base_model: ""
+  method: qlora
+  sequence_length: 4096
