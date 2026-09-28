@@ -15,6 +15,7 @@ class Trajectory:
     verification: dict[str, Any] = field(default_factory=dict)
     success: bool = False
     metadata: dict[str, Any] = field(default_factory=dict)
+    council: dict[str, Any] = field(default_factory=dict)
 
     def record(self, kind: str, payload: dict[str, Any]):
         target = {
@@ -35,6 +36,8 @@ class Trajectory:
             }
         elif kind == "metadata":
             self.metadata.update(payload)
+        elif kind == "council":
+            self.council.update(payload)
 
     def to_training_record(self) -> dict[str, Any]:
         return {
@@ -47,4 +50,5 @@ class Trajectory:
             "verification": self.verification,
             "success": self.success,
             "metadata": self.metadata,
+            "council": self.council,
         }
