@@ -256,8 +256,12 @@ async def multi_ai_stream(request: MultiAIRequest):
     async def generate_one(name: str):
         from ..model.types import GenerationRequest, Message
         prompt = "Solve independently as one member of a multi-AI team. Be concrete and concise.\n\nTask:\n" + request.task + "\n\nContext:\n" + request.context
-        result = await runtime.router.generate_with_provider(GenerationRequest([Message("user", prompt)], max_tokens=request.max_tokens, temperature=0.2), name)
-        return {"provider": name, "model": result.model, "answer": result.content}
+        req = GenerationRequest([Message("user", prompt)], max_tokens=request.max_tokens, temperature=0.2)
+        parts = []
+        async for token in runtime.router.stream_with_provider(req, name):
+            parts.append(token)
+            yield token
+        return {"provider": name, "model": getattr(runtime.router.providers[name], "model", name), "answer": "".join(parts)}
 
     async def stream() -> AsyncIterator[str]:
         yield "data: " + json.dumps({"kind":"multi_start","providers":selected,"judge":judge}, ensure_ascii=False) + "\\n\\n"
