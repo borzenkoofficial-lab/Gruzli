@@ -37,7 +37,9 @@ class AgentLoop:
         council_context: dict | None = None,
     ) -> dict:
         state = ExecutionState(task=task)
-        trajectory = Trajectory(task=task, run_id=state.run_id, metadata={"agents": agents or []})\n        if council_context:\n            trajectory.record("council", council_context)
+        trajectory = Trajectory(task=task, run_id=state.run_id, metadata={"agents": agents or []})
+        if council_context:
+            trajectory.record("council", council_context)
         planner = Planner()
         verifier = Verifier()
         repair_planner = RepairPlanner()
