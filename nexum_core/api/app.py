@@ -119,6 +119,11 @@ async def terminal_stream(prompt: str, system: str = "You are Nexum AI Core. Be 
             yield "data: " + json.dumps({"error": str(exc)}, ensure_ascii=False) + "\\n\\n"
     return StreamingResponse(stream(), media_type="text/event-stream")
 
+@app.get("/reasoning/world")
+async def reasoning_world(query: str = "", limit: int = 8):
+    from ..reasoning.world_model import WorldModel
+    return {"beliefs": WorldModel().search(query, limit) if query else WorldModel().beliefs[:limit]}
+
 @app.get("/learning/status")
 async def learning_status():
     return learning_engine.status()
