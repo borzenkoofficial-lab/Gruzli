@@ -29,6 +29,25 @@ class OllamaProvider:
         self.base_url = (base_url or os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")).rstrip("/")
         self.model = model or os.getenv("OLLAMA_MODEL", "qwen3:4b")
 
+    async def stream(self, request: GenerationRequest) -> AsyncIterator[str]:
+        prompt = "\n".join(f"{m.role}: {m.content}" for m in request.messages)
+        model = getattr(request, "model", None) or self.model
+        payload = {"model": model, "prompt": prompt, "stream": True,
+                   "options": {"temperature": request.temperature, "num_predict": request.max_tokens}}
+        async with httpx.AsyncClient(timeout=None) as client:
+            async with client.stream("POST", f"{self.base_url}/api/generate", json=payload) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if not line:
+                        continue
+                    try:
+                        data = __import__("json").loads(line)
+                    except ValueError:
+                        continue
+                    token = data.get("response", "")
+                    if token:
+                        yield token
+
     async def generate(self, request: GenerationRequest) -> ModelResponse:
         prompt = "\n".join(f"{m.role}: {m.content}" for m in request.messages)
         payload = {"model": request.model or self.model, "prompt": prompt, "stream": False,
