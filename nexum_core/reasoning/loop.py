@@ -13,6 +13,9 @@ from .verifier import Verifier
 from .self_correction import classify_failure, repair_instruction
 from .retry import RetryBudget
 from ..projects.repair_loop import RepairPlanner
+from .world_model import WorldModel
+from .critic import Critic
+from .long_horizon import LongHorizonPlanner
 
 
 @dataclass
@@ -36,6 +39,10 @@ class AgentLoop:
         planner = Planner()
         verifier = Verifier()
         repair_planner = RepairPlanner()
+        world_model = WorldModel()
+        critic = Critic()
+        horizon = LongHorizonPlanner().create(task)
+        emit_bootstrap = True
         retry = RetryBudget(self.max_retries)
         registry = self.executor.registry if self.executor else None
         tool_names = registry.names() if registry else []
@@ -46,7 +53,8 @@ class AgentLoop:
             if event_sink:
                 event_sink(state.events[-1])
 
-        emit("plan", objective=plan.objective, steps=[step.__dict__ for step in plan.steps])
+        emit("plan", objective=plan.objective, steps=[step.__dict__ for step in plan.steps], long_horizon=horizon.__dict__)
+        world_model.observe(f"Active task: {task}", evidence=f"run:{state.run_id}", confidence=0.4)
         messages = [
             Message("system", SYSTEM_POLICY),
             Message("user", f"Task:\n{task}\nContext:\n{context}\nAgents: {agents or []}\nPlan: {[s.__dict__ for s in plan.steps]}\nTools: {registry.prompt_schemas() if registry else '[]'}"),
@@ -91,6 +99,9 @@ class AgentLoop:
                     state.phase = "completed"
                     state.verified = True
                     trajectory.success = True
+                    reflection = critic.evaluate(task, decision.content, True, outputs)
+                    trajectory.record("metadata", {"reflection": reflection.__dict__, "long_horizon": horizon.__dict__})
+                    world_model.observe(f"Completed task: {task}", evidence=f"run:{state.run_id}", confidence=1.0)
                     TrajectoryCollector(self.trajectory_path).append(trajectory)
                     return {"run_id": state.run_id, "answer": decision.content, "iterations": state.iteration, "verified": True, "events": state.events}
                 failure = classify_failure(None, verification.errors)
@@ -161,6 +172,8 @@ class AgentLoop:
 
         state.phase = "failed"
         trajectory.success = False
+        reflection = critic.evaluate(task, "Execution budget exhausted", False, outputs)
+        trajectory.record("metadata", {"reflection": reflection.__dict__, "long_horizon": horizon.__dict__})
         trajectory.record("verification", {"ok": False, "evidence": outputs, "errors": state.errors or ["Execution budget exhausted"]})
         trajectory.metadata["completion"] = {"verified": False, "phase": state.phase, "iterations": state.iteration}
         trajectory.metadata["retry_budget"] = {"max_retries": retry.max_retries, "used": retry.used, "failures": retry.failures}
