@@ -1,41 +1,35 @@
 from dataclasses import dataclass
 from ..model.types import GenerationRequest, Message
 from ..model.router import ModelRouter
+from ..tools.executor import ToolExecutor, ToolCall
+from ..agents.protocol import parse_decision
 from .state import ExecutionState
-from .planner import Planner
-from .verifier import Verifier
-from ..training.trajectory import Trajectory
-from ..training.collector import TrajectoryCollector
+from .policy import SYSTEM_POLICY
 
 @dataclass
 class AgentLoop:
     router: ModelRouter
-    max_iterations: int = 8
+    executor: ToolExecutor | None = None
+    max_iterations: int = 12
 
-    async def run(self, task: str, context: str = "", agents: list[str] | None = None) -> dict:
-        agents = agents or []
-        state = ExecutionState(task=task)
-        plan = Planner().build(task, agents)
-        trajectory = Trajectory(task=task, metadata={"agents": agents, "plan": [s.__dict__ for s in plan.steps]})
-        messages = [
-            Message("system", "You are Nexum AI Core. Plan, act, observe, verify. Never claim unobserved actions."),
-            Message("user", f"Task:\n{task}\n\nContext:\n{context}\n\nPlan:\n{plan.objective}")
-        ]
+    async def run(self, task: str, context: str = '', agents: list[str] | None = None) -> dict:
+        state=ExecutionState(task=task)
+        messages=[Message('system',SYSTEM_POLICY), Message('user',f'Task:\n{task}\nContext:\n{context}\nAgents: {agents or []}')]
         for i in range(self.max_iterations):
-            state.iteration = i + 1
-            result = await self.router.generate(GenerationRequest(messages=messages, max_tokens=2048))
-            state.event("model_output", iteration=i + 1, model=result.model, content=result.content)
-            trajectory.record("message", {"role":"assistant","content":result.content,"iteration":i+1})
-            messages.append(Message("assistant", result.content))
-            if result.content.strip().lower().startswith("final:"):
-                verification = Verifier().verify([result.content], "model produced final response")
-                state.phase = "completed"
-                state.verified = verification.ok
-                trajectory.verification = verification.__dict__
-                trajectory.success = verification.ok
-                break
-            messages.append(Message("user", "Continue only if work remains. Verify the previous step and produce the next concrete step."))
-        if not trajectory.verification:
-            trajectory.verification = {"ok": False, "evidence": [], "errors": ["Run ended without explicit FINAL:"]}
-        TrajectoryCollector("data/memory/trajectories.jsonl").append(trajectory)
-        return {"answer": state.events[-1]["content"] if state.events else "", "iterations": state.iteration, "verified": state.verified, "events": state.events, "plan": plan.objective}
+            state.iteration=i+1
+            result=await self.router.generate(GenerationRequest(messages=messages,max_tokens=2048,temperature=0.2))
+            state.event('model_output',iteration=i+1,model=result.model,content=result.content)
+            decision=parse_decision(result.content)
+            if decision.kind=='final':
+                state.phase='completed'; state.verified=True
+                return {'answer':decision.content,'iterations':state.iteration,'verified':True,'events':state.events}
+            if decision.kind=='actions' and self.executor:
+                for action in decision.actions:
+                    state.event('action_requested',id=action.id,tool=action.tool,arguments=action.arguments)
+                    tool_result=self.executor.execute(ToolCall(action.name if hasattr(action,'name') else action.tool, action.arguments))
+                    state.event('tool_result',id=action.id,tool=action.tool,ok=tool_result.ok,output=tool_result.output,error=tool_result.error)
+                    messages.append(Message('user',f'Tool {action.tool} result: ok={tool_result.ok}; output={tool_result.output}; error={tool_result.error}. Evaluate this result.'))
+            else:
+                messages.append(Message('user','Convert your next step into a valid JSON action or return a JSON final only after verification.'))
+        state.phase='failed'
+        return {'answer':'Execution budget exhausted without verified completion.','iterations':state.iteration,'verified':False,'events':state.events}
