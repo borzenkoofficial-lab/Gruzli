@@ -129,10 +129,10 @@ class ProjectRuntime:
             self.state.set("ready", restored_from=snapshot_id)
         return ProjectResult(ok, "restore", {"snapshot_id": snapshot_id})
 
-    def verify_and_repair(self, max_attempts: int = 3) -> dict[str, Any]:
+    def verify_and_repair(self, max_attempts: int = 3, repair=None) -> dict[str, Any]:
         from .repair import RepairEngine
         checkpoint = self.checkpoint("before-verification-repair")
-        attempts = RepairEngine(self, max_attempts).verify_and_repair()
+        attempts = RepairEngine(self, max_attempts).verify_and_repair(repair=repair)
         ok = bool(attempts) and attempts[-1].ok
         if not ok and checkpoint.get("id"):
             self.restore(checkpoint["id"])
