@@ -1,12 +1,13 @@
-from dataclasses import dataclass, field
-from typing import Any, Callable
+from abc import ABC, abstractmethod
+from typing import Any
 
-@dataclass
-class Tool:
+class Tool(ABC):
     name: str
     description: str
-    handler: Callable[..., Any]
-    schema: dict[str, Any] = field(default_factory=dict)
 
-    def execute(self, **kwargs):
-        return self.handler(**kwargs)
+    @abstractmethod
+    def execute(self, **kwargs) -> Any:
+        raise NotImplementedError
+
+    def schema(self) -> dict:
+        return {"name": self.name, "description": self.description}
