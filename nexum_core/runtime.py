@@ -4,6 +4,8 @@ from .tools.workspace import build_registry
 from .tools.code_runner import CodeRunner
 from .tools.command_runner import RunCommand
 from .tools.executor import ToolExecutor
+from .tools.web import WebFetchTool, NetworkPolicy
+from .config.settings import settings
 from .reasoning.loop import AgentLoop
 from .agents.orchestrator import Orchestrator
 
@@ -16,6 +18,7 @@ class NexumRuntime:
         self.tools = build_registry(workspace)
         self.tools.register(CodeRunner())
         self.tools.register(RunCommand(workspace))
+        self.tools.register(WebFetchTool(NetworkPolicy(mode=settings.network_mode, max_bytes=settings.network_max_bytes, timeout=settings.network_timeout)))
         self.executor = ToolExecutor(self.tools)
         self.orchestrator = Orchestrator()
         self.loop = AgentLoop(self.router, self.executor)
