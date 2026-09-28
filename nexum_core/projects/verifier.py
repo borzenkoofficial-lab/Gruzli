@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from .runtime import ProjectRuntime
+from .evidence import verify_checks, VerificationResult
 
 
 @dataclass
@@ -30,7 +31,8 @@ class ProjectVerifier:
         if test:
             result = self.runtime.test()
             checks.append({"name": "test", "ok": result.ok, "details": result.details})
-        return VerificationReport(bool(checks) and all(c["ok"] for c in checks), checks)
+        typed = verify_checks(checks, {name for name in ("build" if build else None, "test" if test else None) if name})
+        return VerificationReport(typed.ok, checks + [{"name": "evidence", "ok": typed.ok, "details": typed.as_dict()}])
 
     def verify_python(self) -> VerificationReport:
         result = self.runtime.command("python", ["-m", "compileall", "-q", "."], 120)
