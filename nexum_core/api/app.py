@@ -228,6 +228,25 @@ async def run_events(run_id: str):
             await asyncio.sleep(0.15)
     return StreamingResponse(stream(),media_type="text/event-stream")
 
+@app.post("/projects/clone")
+async def project_clone(request: ProjectCloneRequest):
+    root = Path(request.path).resolve()
+    allowed = Path(".").resolve()
+    try:
+        root.relative_to(allowed)
+    except ValueError as exc:
+        raise HTTPException(status_code=403, detail="Project path is outside the AI Core workspace") from exc
+    result = runtime.executor.execute(ToolCall("git_workspace", {
+        "operation": "clone",
+        "path": str(root.relative_to(allowed)),
+        "repository": request.repository,
+    }))
+    return {"ok": result.ok, "output": result.output, "error": result.error}
+
+@app.post("/projects/open")
+async def project_open(request: ProjectRequest):
+    return get_project(request.path).inspect().__dict__
+
 @app.post("/projects/run")
 async def project_run(request: ProjectRunRequest):
     project = get_project(request.path)
