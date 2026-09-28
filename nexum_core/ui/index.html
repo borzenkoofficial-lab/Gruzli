@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Nexum</title><link rel="stylesheet" href="/ui/style.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand"><div class="brand-mark">N</div><span>Nexum</span></div>
+    <button class="new-chat" id="newChat"><span>＋</span> Новый чат</button>
+    <div class="section-label">Чаты</div>
+    <div class="history" id="history"></div>
+    <div class="sidebar-bottom">
+      <button class="ghost" id="clearHistory">Очистить историю</button>
+      <div class="status"><span class="dot" id="statusDot"></span><span id="statusText">Проверка Core…</span></div>
+    </div>
+  </aside>
+  <main class="main">
+    <header class="topbar">
+      <button class="icon-button mobile-only" id="menu">☰</button>
+      <div class="model-wrap"><button class="model-button" id="modelButton">Nexum Core <span>⌄</span></button><div class="model-menu hidden" id="modelMenu"><button data-model="core">Nexum Core</button><button data-model="qwen">Qwen / Teacher</button></div></div>
+      <div class="top-actions"><button class="icon-button" id="newChatTop" title="Новый чат">＋</button></div>
+    </header>
+    <section class="conversation" id="conversation">
+      <div class="welcome" id="welcome">
+        <div class="welcome-mark">N</div>
+        <h1>Чем займёмся?</h1>
+        <p>Nexum Core — рабочий интерфейс для диалога с ядром, агентами и инструментами.</p>
+        <div class="suggestions">
+          <button data-prompt="Проанализируй структуру проекта и найди проблемы">Проанализируй проект</button>
+          <button data-prompt="Создай план разработки приложения">Составь план</button>
+          <button data-prompt="Проведи проверку доступных инструментов">Проверь инструменты</button>
+        </div>
+      </div>
+    </section>
+    <form class="composer" id="composer">
+      <div class="composer-inner">
+        <textarea id="input" rows="1" placeholder="Сообщение для Nexum…" autocomplete="off"></textarea>
+        <button class="send" id="send" type="submit" aria-label="Отправить">↑</button>
+      </div>
+      <div class="composer-note">Nexum может ошибаться. Проверяй результаты выполнения и изменения проекта.</div>
+    </form>
+  </main>
+</div>
+<script src="/ui/app.js"></script>
+</body></html>
