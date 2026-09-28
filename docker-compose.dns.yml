@@ -1,0 +1,16 @@
+services:
+  nexum-dns:
+    image: coredns/coredns:1.12.2
+    container_name: nexum-dns
+    restart: unless-stopped
+    command: -conf /etc/coredns/Corefile
+    volumes:
+      - ./infra/dns/Corefile:/etc/coredns/Corefile:ro
+    ports:
+      - "127.0.0.1:5353:53/udp"
+      - "127.0.0.1:5353:53/tcp"
+    healthcheck:
+      test: ["CMD", "sh", "-c", "cat /etc/coredns/Corefile >/dev/null"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
