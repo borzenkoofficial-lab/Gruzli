@@ -45,7 +45,7 @@ class ProjectRuntime:
         info = self.manager.inspect()
         if not info["has_package_json"]:
             return ProjectResult(False, "install", {"error": "package.json not found"})
-        return self.command("npm", ["install"], 120)
+        return self.command("npm", ["install", "--ignore-scripts"], 120)
 
     def build(self) -> ProjectResult:
         info = self.manager.inspect()
