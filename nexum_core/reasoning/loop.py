@@ -109,8 +109,11 @@ class AgentLoop:
                         return {"run_id": state.run_id, "answer": "Run cancelled.", "iterations": state.iteration, "verified": False, "cancelled": True, "events": state.events}
                     key = (action.tool, repr(sorted(action.arguments.items())))
                     if key in seen:
-                        emit("action_skipped_duplicate", id=action.id, tool=action.tool)
-                        continue
+                        # Verification/repair often needs to rerun the same build/test after a mutation.
+                        # Allow a previously failed action to be retried after the model changes state.
+                        if not any(e.get("kind") == "repair" for e in state.events[-8:]):
+                            emit("action_skipped_duplicate", id=action.id, tool=action.tool)
+                            continue
                     seen.add(key)
                     executed = True
                     state.current_step = action.id
