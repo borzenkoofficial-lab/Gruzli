@@ -10,6 +10,17 @@ class ModelRouter:
         self._register_defaults()
         self.default = os.getenv("AI_PROVIDER", "mock").lower()
 
+    def register_openai_compatible(self, name: str, base_url: str, api_key: str, model: str) -> None:
+        safe_name = name.strip().lower().replace(" ", "_")
+        if not safe_name or safe_name in {"mock", "ollama"}:
+            raise ValueError("Invalid or reserved provider name")
+        self.providers[safe_name] = OpenAICompatibleProvider(base_url, api_key, model)
+
+    def remove(self, name: str) -> bool:
+        if name in {"mock", "ollama"}:
+            return False
+        return self.providers.pop(name, None) is not None
+
     def _register_defaults(self) -> None:
         self.providers["mock"] = MockProvider()
         if os.getenv("OLLAMA_URL") or os.getenv("AI_PROVIDER", "mock").lower() == "ollama":
