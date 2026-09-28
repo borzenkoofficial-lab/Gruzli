@@ -122,8 +122,10 @@ async def terminal_stream(prompt: str, system: str = "You are Nexum AI Core. Be 
 @app.post("/conversation/observe")
 async def conversation_observe(payload: dict[str, Any]):
     from ..conversation.engine import ConversationEngine, ConversationState
-    state=ConversationState(conversation_id=str(payload.get("conversation_id") or "")) if payload.get("conversation_id") else ConversationState()
-    result=ConversationEngine().observe_user(state, str(payload.get("text", "")))
+    engine=ConversationEngine()
+    cid=str(payload.get("conversation_id") or "")
+    state=engine.load(cid) if cid else ConversationState()
+    result=engine.observe_user(state, str(payload.get("text", "")))
     return {"conversation_id": state.conversation_id, **result}
 
 @app.get("/reasoning/world")
