@@ -1,23 +1,46 @@
 from dataclasses import dataclass
 from typing import Any
 
+
 @dataclass
 class Verification:
     ok: bool
     evidence: list[Any]
     errors: list[str]
+    checks: list[dict[str, Any]]
+
 
 class Verifier:
     def verify(self, outputs: list[Any], required: str) -> Verification:
         evidence = [item for item in outputs if item is not None]
         if not evidence:
-            return Verification(False, [], ['No observable execution output'])
-        condition = required.lower().strip()
-        if condition in ('', 'observable evidence confirms completion.', 'observable evidence confirms completion'):
-            return Verification(True, evidence, [])
-        normalized = ' '.join(str(item) for item in evidence).lower()
-        keywords = [w.strip('.,:;()[]{}\'\"') for w in condition.split() if len(w.strip('.,:;()[]{}\'\"')) >= 4]
-        missing = [w for w in keywords if w not in normalized]
+            return Verification(False, [], ["No observable execution output"], [])
+
+        condition = required.strip()
+        checks: list[dict[str, Any]] = []
+
+        if not condition or condition.lower().startswith("observable evidence confirms"):
+            checks.append({"type": "presence", "ok": True})
+            return Verification(True, evidence, [], checks)
+
+        normalized = " ".join(str(item) for item in evidence).lower()
+        words = [
+            w.strip(".,:;()[]{}'\"")
+            for w in condition.lower().split()
+            if len(w.strip(".,:;()[]{}'\"")) >= 4
+        ]
+        missing = [word for word in words if word not in normalized]
+        checks.append({
+            "type": "content",
+            "required": condition,
+            "matched": len(words) - len(missing),
+            "missing": missing,
+        })
         if missing:
-            return Verification(False, evidence, [f'Success condition not evidenced: {required}'])
-        return Verification(True, evidence, [])
+            return Verification(
+                False,
+                evidence,
+                [f"Success condition not evidenced: {condition}"],
+                checks,
+            )
+        return Verification(True, evidence, [], checks)
