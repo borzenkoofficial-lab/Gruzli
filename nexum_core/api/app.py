@@ -44,6 +44,11 @@ class ToolRequest(BaseModel):
 class ProjectRequest(BaseModel):
     path: str
 
+class ProjectRunRequest(BaseModel):
+    path: str
+    operation: str
+    install: bool = False
+
 class RepairPlanRequest(BaseModel):
     parsed_error: dict[str, Any] = Field(default_factory=dict)
 
@@ -219,6 +224,15 @@ async def run_events(run_id: str):
             if record.status in runs.TERMINAL and sent>=len(record.events): break
             await asyncio.sleep(0.15)
     return StreamingResponse(stream(),media_type="text/event-stream")
+
+@app.post("/projects/run")
+async def project_run(request: ProjectRunRequest):
+    project = get_project(request.path)
+    allowed = {"inspect": project.inspect, "install": project.install, "build": project.build, "test": project.test}
+    if request.operation not in allowed:
+        raise HTTPException(status_code=400, detail="Unsupported project operation")
+    result = allowed[request.operation]()
+    return result.__dict__
 
 @app.post("/projects/inspect")
 async def project_inspect(request: ProjectRequest): return get_project(request.path).inspect().__dict__
