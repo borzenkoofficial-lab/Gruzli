@@ -19,7 +19,7 @@
   <main class="main">
     <header class="topbar">
       <button class="icon-button mobile-only" id="menu">☰</button>
-      <div class="model-wrap"><button class="model-button" id="modelButton">Nexum Core <span>⌄</span></button><div class="model-menu hidden" id="modelMenu"><button data-model="core">Nexum Core</button><button data-model="qwen">Qwen / Teacher</button></div></div>
+      <div class="model-wrap"><button class="model-button" id="modelButton">Nexum Core <span>⌄</span></button><div class="model-menu hidden" id="modelMenu"><div id="providerOptions"></div><button id="addProvider">＋ Добавить ИИ по API</button></div></div>
       <div class="top-actions"><button class="icon-button" id="newChatTop" title="Новый чат">＋</button></div>
     </header>
     <section class="conversation" id="conversation">
@@ -41,7 +41,20 @@
       </div>
       <div class="composer-note">Nexum может ошибаться. Проверяй результаты выполнения и изменения проекта.</div>
     </form>
-  </main>
+  <div class="modal hidden" id="providerModal">
+  <div class="modal-card">
+    <div class="modal-head"><h2>Подключить ИИ</h2><button class="icon-button" id="closeProvider">×</button></div>
+    <label>Провайдер<select id="providerPreset"><option value="openai">OpenAI</option><option value="deepseek">DeepSeek</option><option value="custom">Другой OpenAI-compatible API</option></select></label>
+    <label>Название<input id="providerName" placeholder="Например: DeepSeek"></label>
+    <label>API URL<input id="providerUrl" placeholder="https://api.deepseek.com/v1"></label>
+    <label>Модель<input id="providerModel" placeholder="deepseek-chat"></label>
+    <label>API ключ<input id="providerKey" type="password" autocomplete="off" placeholder="sk-…"></label>
+    <p class="modal-note">Ключ передаётся Core и хранится только в памяти процесса. Он не возвращается интерфейсу.</p>
+    <button class="primary" id="saveProvider">Подключить</button>
+    <div id="providerError"></div>
+  </div>
+</div>
+</main>
 </div>
 <script src="/ui/app.js"></script>
 </body></html>
