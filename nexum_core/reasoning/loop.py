@@ -23,7 +23,7 @@ class AgentLoop:
         planner = Planner()
         verifier = Verifier()
         registry = self.executor.registry if self.executor else None
-        tool_names = list(registry._tools) if registry else []
+        tool_names = registry.names() if registry else []
         plan = planner.build(task, agents or [], tool_names)
         state.event('plan', objective=plan.objective, steps=[step.__dict__ for step in plan.steps])
         messages = [
