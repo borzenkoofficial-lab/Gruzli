@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 from nexum_core.training.collector import TrajectoryCollector
 from nexum_core.training.dataset import DatasetRecord, DatasetStore
-from nexum_core.training.preferences import from_verification
+from nexum_core.training.quality import DatasetQuality
 
 def main():
     collector = TrajectoryCollector("data/memory/trajectories.jsonl")
