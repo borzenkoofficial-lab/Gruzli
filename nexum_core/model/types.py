@@ -17,6 +17,7 @@ class ToolCall:
 class GenerationRequest:
     messages: list[Message]
     max_tokens: int = 2048
+    model: str | None = None
     temperature: float = 0.2
 
 @dataclass
