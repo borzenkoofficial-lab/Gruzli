@@ -3,7 +3,8 @@ import asyncio, json
 from pathlib import Path
 from typing import Any, AsyncIterator
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from ..evals.runtime import all_passed, run_runtime_evals
 from ..learning.teacher import TeacherLoop
@@ -15,7 +16,9 @@ from ..reasoning.state import RunManager
 from ..runtime import NexumRuntime
 from ..tools.executor import ToolCall
 
-app = FastAPI(title="Nexum AI Core", version="0.7.0")
+app = FastAPI(title="Nexum AI Core", version="0.8.0")
+UI_DIR = Path(__file__).resolve().parent.parent / "ui"
+app.mount("/ui", StaticFiles(directory=UI_DIR), name="ui")
 runtime = NexumRuntime(".")
 runs = RunManager()
 learning = LearningMemory(runtime.memory)
@@ -54,6 +57,10 @@ class CurriculumRequest(BaseModel):
     topic: str
     count: int = 5
     session_id: str = "api-curriculum"
+
+@app.get("/", include_in_schema=False)
+async def ui_home():
+    return FileResponse(UI_DIR / "index.html")
 
 def get_project(path: str) -> ProjectRuntime:
     root = Path(path).resolve()
@@ -122,7 +129,7 @@ async def learn_chat(request: ChatRequest):
     return {"session_id": session_id, "answer": answer, "recalled": recalled}
 
 @app.get("/health")
-async def health(): return {"status":"ok","service":"nexum-ai-core","version":"0.7.0"}
+async def health(): return {"status":"ok","service":"nexum-ai-core","version":"0.8.0","ui":"/"}
 
 @app.get("/agents")
 async def agents(): return {"agents":[a.describe() for a in runtime.orchestrator.agents.values()]}
