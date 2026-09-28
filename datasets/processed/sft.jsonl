@@ -1,0 +1,2 @@
+{"messages":[{"role":"user","content":"Create a minimal health endpoint"},{"role":"assistant","content":"Implemented /health and verified HTTP 200."}]}
+{"messages":[{"role":"user","content":"Fix a workspace traversal bug"},{"role":"assistant","content":"Resolved the target path and enforced root containment."}]}
