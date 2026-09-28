@@ -260,7 +260,6 @@ async def multi_ai_stream(request: MultiAIRequest):
         parts = []
         async for token in runtime.router.stream_with_provider(req, name):
             parts.append(token)
-            yield token
         return {"provider": name, "model": getattr(runtime.router.providers[name], "model", name), "answer": "".join(parts)}
 
     async def stream() -> AsyncIterator[str]:
