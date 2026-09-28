@@ -1,0 +1,13 @@
+base_model: Qwen/Qwen2.5-0.5B-Instruct
+dataset: datasets/processed/sft.jsonl
+output_dir: artifacts/sft
+epochs: 1
+batch_size: 1
+gradient_accumulation: 8
+learning_rate: 0.00002
+
+# Training ladder:
+# 1) SFT on verified trajectories
+# 2) preference optimization (DPO)
+# 3) outcome-based reasoning optimization (GRPO)
+# 4) distillation from stronger teacher models
