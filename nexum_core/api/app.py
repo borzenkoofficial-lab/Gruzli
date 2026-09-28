@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -8,7 +7,7 @@ from ..projects.runtime import ProjectRuntime
 from ..runtime import NexumRuntime
 from ..tools.executor import ToolCall
 
-app = FastAPI(title="Nexum AI Core", version="0.4.0")
+app = FastAPI(title="Nexum AI Core", version="0.4.1")
 runtime = NexumRuntime(".")
 project_runtimes: dict[str, ProjectRuntime] = {}
 
@@ -38,13 +37,18 @@ class PreviewRequest(BaseModel):
 
 def get_project(path: str) -> ProjectRuntime:
     root = Path(path).resolve()
+    allowed = Path(".").resolve()
+    try:
+        root.relative_to(allowed)
+    except ValueError as exc:
+        raise HTTPException(status_code=403, detail="Project path is outside the AI Core workspace") from exc
     project_runtimes[str(root)] = project_runtimes.get(str(root), ProjectRuntime(str(root)))
     return project_runtimes[str(root)]
 
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "nexum-ai-core", "version": "0.4.0"}
+    return {"status": "ok", "service": "nexum-ai-core", "version": "0.4.1"}
 
 
 @app.get("/agents")
@@ -88,7 +92,12 @@ async def project_lifecycle(request: ProjectRequest):
     return get_project(request.path).lifecycle(install=True)
 
 
-@app.post("/projects/verify-repair")\nasync def project_verify_repair(request: ProjectRequest):\n    return get_project(request.path).verify_and_repair()\n\n\n@app.post("/projects/preview/start")
+@app.post("/projects/verify-repair")
+async def project_verify_repair(request: ProjectRequest):
+    return get_project(request.path).verify_and_repair()
+
+
+@app.post("/projects/preview/start")
 async def preview_start(request: PreviewRequest):
     result = get_project(request.path).start_preview()
     return result.__dict__
