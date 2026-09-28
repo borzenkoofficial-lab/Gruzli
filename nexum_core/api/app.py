@@ -16,6 +16,7 @@ from ..projects.repair_loop import RepairPlanner
 from ..reasoning.state import RunManager
 from ..runtime import NexumRuntime
 from ..tools.executor import ToolCall
+from ..config.settings import settings
 
 app = FastAPI(title="Nexum AI Core", version="0.8.0")
 UI_DIR = Path(__file__).resolve().parent.parent / "ui"
@@ -132,8 +133,12 @@ async def learn_chat(request: ChatRequest):
     learning.record_message(session_id, "assistant", answer)
     return {"session_id": session_id, "answer": answer, "recalled": recalled}
 
+@app.get("/network")
+async def network_status():
+    return {"mode": settings.network_mode, "max_bytes": settings.network_max_bytes, "timeout": settings.network_timeout, "tool": "web_fetch"}
+
 @app.get("/health")
-async def health(): return {"status":"ok","service":"nexum-ai-core","version":"0.8.0","ui":"/"}
+async def health(): return {"status":"ok","service":"nexum-ai-core","version":"0.8.0","ui":"/", "network_mode": settings.network_mode}
 
 @app.get("/agents")
 async def agents(): return {"agents":[a.describe() for a in runtime.orchestrator.agents.values()]}
